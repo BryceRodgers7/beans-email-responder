@@ -1,0 +1,20 @@
+# Non-secret, version-controlled tunables. Secrets live in env vars / .env.
+
+[openai]
+model = "gpt-4o-mini"
+temperature = 0.4
+max_retries = 1
+
+[gmail]
+label_new    = "Website Inquiries/New"
+label_done   = "Website Inquiries/AI Draft Created"
+label_error  = "Website Inquiries/Error"
+label_drafts = "Website Inquiries/AI Assisted Drafts"
+# Safety cap on how many inquiries to process per run.
+max_batch = 25
+
+[draft]
+# Drafts get this subject. The prefix makes them easy to spot/search in Gmail's
+# Drafts list (a custom label alone can't move a draft out of the Drafts folder).
+subject_prefix = "[AI Draft]"
+subject = "Re: your inquiry"

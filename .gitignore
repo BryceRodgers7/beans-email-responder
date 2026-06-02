@@ -1,0 +1,19 @@
+# Secrets — never commit
+.env
+credentials.json
+token.json
+
+# Local test outputs
+out/*
+!out/.gitkeep
+
+# Example inquiries contain real client PII — keep them out of git.
+# (examples/README.md stays tracked to document the format.)
+examples/*.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
