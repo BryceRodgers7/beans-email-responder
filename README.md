@@ -5,7 +5,9 @@ inquiry emails under a Gmail label, drafts a warm reply with the OpenAI API,
 and saves a Gmail draft **addressed to the client's email from the form body**
 for you to review and send manually. It never sends email.
 
-See **[DESIGN.md](DESIGN.md)** for the full architecture and phased plan.
+See **[DESIGN.md](DESIGN.md)** for the full architecture and phased plan,
+**[SETUP.md](SETUP.md)** for operational setup, and **[STATUS.md](STATUS.md)**
+for current state / what's next (start here when resuming).
 
 ## Status
 
