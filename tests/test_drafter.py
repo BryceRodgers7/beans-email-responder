@@ -81,6 +81,12 @@ def test_generate_draft_returns_text_and_sends_two_messages(settings, fields):
     assert "jane.sample@gmail.com" in sent["messages"][1]["content"]
 
 
+def test_generate_draft_returns_body_only_no_footer(settings, fields):
+    # The footer is the caller's job (app.run); the drafter returns body only.
+    client = FakeClient(lambda n, kw: _ok_response("Body text."))
+    assert generate_draft(fields, settings, client=client) == "Body text."
+
+
 def test_generate_draft_retries_then_succeeds(settings, fields, monkeypatch):
     monkeypatch.setattr(drafter.time, "sleep", lambda *_: None)
 

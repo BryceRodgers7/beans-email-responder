@@ -1,0 +1,15 @@
+# FALLBACK footer only. Normally the footer comes from the account's Gmail
+# signature (read via the gmail.settings.basic scope) and this file is ignored.
+#
+# It is used ONLY when the Gmail signature can't be read — e.g. the settings
+# scope hasn't been granted yet (re-run `python -m app.auth_bootstrap`), the
+# account has no signature set, or the API call fails.
+#
+# To set a fallback, remove the leading "# " from real footer lines, e.g.:
+#
+#   Warm regards,
+#   Jordan — The Mental Gain
+#   thementalgain.com  ·  (555) 123-4567
+#
+# Lines starting with "#" are ignored. With only "#" lines, no fallback footer
+# is used.

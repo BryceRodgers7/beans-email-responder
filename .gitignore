@@ -10,6 +10,12 @@ out/*
 # Example inquiries contain real client PII — keep them out of git.
 # (examples/README.md stays tracked to document the format.)
 examples/*.txt
+examples/*.eml
+
+# Source template export (a real downloaded .eml: ~1MB, has a real recipient).
+# The extracted body lives in config/template_body.* (tracked); attachments/
+# (the PDFs) are tracked. The raw .eml is just a reference, not needed at runtime.
+template/*.eml
 
 # Python
 __pycache__/

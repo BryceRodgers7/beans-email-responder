@@ -14,7 +14,7 @@ label_drafts = "Website Inquiries/AI Assisted Drafts"
 max_batch = 25
 
 [draft]
-# Drafts get this subject. The prefix makes them easy to spot/search in Gmail's
-# Drafts list (a custom label alone can't move a draft out of the Drafts folder).
-subject_prefix = "[AI Draft]"
+# Drafts get this subject. No prefix — AI drafts are identified by the
+# `AI Assisted Drafts` label (set subject_prefix to a value to re-enable one).
+subject_prefix = ""
 subject = "Re: your inquiry"

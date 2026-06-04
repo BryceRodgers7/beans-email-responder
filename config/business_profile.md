@@ -16,15 +16,17 @@ parents on behalf of their child).
 - TODO: confirm one or two sentences describing the practice and its approach.
 
 ## What we offer
-TODO — list the actual services here. Until this is filled in, the AI has no
-service details and must not describe specific offerings.
-(Do not put example/placeholder service names here: the model will repeat
-anything in this file as fact.)
+The detailed services, session formats, pricing, and booking link live in the
+FIXED template body (`config/template_body.*`), which is appended to every draft
+automatically. The model only writes the personalized opening paragraph, so it
+does not need to (and must not) describe specific offerings or pricing here.
 
 ## Voice & tone
 - Warm, professional, conversational, concise, helpful.
 - Not overly formal. Not pushy or salesy.
-- TODO: sign-off + sender name to use (e.g. "Warmly, <Name> — The Mental Gain").
+- Sign-off/footer is NOT written by the model — it is appended automatically
+  from the account's **Gmail signature** (with `config/signature.txt` as a
+  fallback). Keep the footer out of this profile and the model's output.
 
 ## Things we must NOT say
 - Never quote prices or discounts (none are listed above).

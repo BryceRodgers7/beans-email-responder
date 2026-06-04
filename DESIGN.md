@@ -152,9 +152,19 @@ Why labels as state: zero infra, human-inspectable in the Gmail UI, naturally id
 **What we do instead (closest practical alternative):**
 1. Create the draft normally (it appears in Drafts — unavoidable).
 2. **Apply the custom label `Website Inquiries/AI Assisted Drafts` to the draft's underlying message** via `users.messages.modify`. The draft is then findable under that label as well as Drafts. (Label-on-draft support varies slightly by client, so we also do #3.)
-3. **Prefix the draft subject with `[AI Draft]`** so it's unmistakable in the Drafts list and searchable (`subject:[AI Draft]`).
+3. *(Optional)* A subject prefix can be set via `draft.subject_prefix` in
+   `config/settings.toml` to make drafts searchable. It currently defaults to
+   empty (no prefix) — AI drafts are identified by the `AI Assisted Drafts` label.
 
 This gives you a clear, filterable view of AI-assisted drafts without fighting Gmail's system-folder rules.
+
+**Signature/footer:** Gmail does not apply the account signature to
+API-created drafts, so the app reads the send-as signature (via the
+`gmail.settings.basic` scope) and appends it. To keep the signature's links and
+images, drafts are built as **`multipart/alternative`** (plain-text fallback +
+HTML part with the signature HTML verbatim). See `app/run.resolve_footer` /
+`build_raw_message`; `config/signature.txt` is a plain-text fallback when the
+signature can't be read.
 
 ---
 
@@ -213,7 +223,7 @@ This means **one** consent, and the long-lived refresh token is the only Gmail s
   - `temperature` low (e.g. `0.4`).
   - The system prompt instructs: *if key info is missing, do not fabricate — instead include a clearly marked line the business owner can fill in, e.g. `[NEEDS REVIEW: client did not specify a budget/timeline].`*
   - We pass the parsed fields as structured text, not the raw email, so the model can't latch onto signatures/footers.
-- **Output:** plain email body text (no subject invention; subject is derived deterministically as `[AI Draft] Re: <original subject or 'Your inquiry'>`).
+- **Output:** plain email body text (no subject invention; subject is derived deterministically from `config/settings.toml` — `Re: your inquiry` by default, with an optional prefix). The business footer from `config/signature.txt` is appended after the model's text.
 - **Resilience:** one retry with backoff on transient errors; on hard failure the message goes to `Error`. Token/usage is logged (counts only) for cost visibility.
 - **Cost:** at a few inquiries/day on `gpt-4o-mini`, this is fractions of a cent per draft.
 
@@ -330,7 +340,7 @@ Each phase is independently runnable and reviewable.
 ### Phase 3 — Gmail integration + full pass (1–2 days)
 - `auth_bootstrap.py` (one-time consent → `token.json`).
 - `gmail_client.py`: credentials-from-token-or-env, `ensure_labels`, `list_by_label`, `get_message`, `create_draft`, `modify_labels`.
-- `run.py`: the full one-pass loop with per-message try/except → `Error`, success relabeling, `[AI Draft]` subject + `AI Assisted Drafts` label on the draft.
+- `run.py`: the full one-pass loop with per-message try/except → `Error`, success relabeling, configured subject + `AI Assisted Drafts` label on the draft.
 - **Done when:** sending yourself a test inquiry → labeling it `New` → running locally produces a correctly-addressed draft and relabels the inquiry to `AI Draft Created`. **MVP complete.**
 
 ### Phase 4 — Local prompt-iteration harness (½ day)

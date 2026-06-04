@@ -70,7 +70,7 @@ arrive **From** `noreply@thementalgain.com` with a **Subject** like
   are now under `Website Inquiries/New`.
 - Once the GitHub Action runs (see `SETUP_FOR_SISTER.md`), each message under
   `New` should move to `AI Draft Created`, a draft reply should appear in Gmail's
-  **Drafts** with subject `[AI Draft] Re: your inquiry`, and that draft is tagged
+  **Drafts** with subject `Re: your inquiry`, and that draft is tagged
   `Website Inquiries/AI Assisted Drafts`.
 
 ---

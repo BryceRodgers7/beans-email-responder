@@ -19,7 +19,12 @@ from .parser import _strip_html
 
 log = get_logger()
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    # Read-only-in-practice: lets us read the account's send-as signature so the
+    # business footer on drafts matches what the owner normally uses.
+    "https://www.googleapis.com/auth/gmail.settings.basic",
+]
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -119,16 +124,49 @@ def extract_subject(payload: dict) -> str:
     return ""
 
 
-def build_raw_message(to: str, subject: str, body: str) -> str:
+def pick_signature_html(send_as_entries: list[dict]) -> str:
+    """Choose the best send-as signature (HTML) from a sendAs.list response.
+
+    Prefers the primary address; falls back to any entry that has a non-empty
+    signature. Returns "" when no address has a signature set.
+    """
+    ordered = sorted(send_as_entries, key=lambda entry: not entry.get("isPrimary", False))
+    for entry in ordered:
+        signature = (entry.get("signature") or "").strip()
+        if signature:
+            return signature
+    return ""
+
+
+def build_raw_message(
+    to: str,
+    subject: str,
+    body: str,
+    html_body: str | None = None,
+    attachments: list[dict] | None = None,
+) -> str:
     """Build a base64url-encoded RFC-822 message for drafts.create.
 
-    From is left to Gmail (the authenticated account). The draft is a fresh
-    message to the client, not a reply within the notification thread.
+    When ``html_body`` is given, the message carries a ``multipart/alternative``
+    (plain-text fallback + HTML, so signature links/images render). When
+    ``attachments`` are given (each a dict with ``data`` bytes, ``maintype``,
+    ``subtype``, ``filename``), the whole thing is wrapped in ``multipart/mixed``.
+    From is left to Gmail (the authenticated account); the draft is a fresh
+    message to the client, not a reply within the thread.
     """
     message = EmailMessage()
     message["To"] = to
     message["Subject"] = subject
     message.set_content(body)
+    if html_body:
+        message.add_alternative(html_body, subtype="html")
+    for attachment in attachments or []:
+        message.add_attachment(
+            attachment["data"],
+            maintype=attachment["maintype"],
+            subtype=attachment["subtype"],
+            filename=attachment["filename"],
+        )
     return base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 
 
@@ -182,6 +220,15 @@ class GmailClient:
         )
         return [m["id"] for m in resp.get("messages", [])]
 
+    def get_signature(self) -> str:
+        """Return the account's send-as HTML signature ("" if none is set).
+
+        Requires the ``gmail.settings.basic`` scope; raises if it wasn't granted
+        (the caller decides whether to treat that as "no footer").
+        """
+        resp = self.service.users().settings().sendAs().list(userId="me").execute()
+        return pick_signature_html(resp.get("sendAs", []))
+
     def get_text_and_subject(self, msg_id: str) -> tuple[str, str]:
         msg = (
             self.service.users()
@@ -192,9 +239,20 @@ class GmailClient:
         payload = msg.get("payload", {})
         return extract_plain_text(payload), extract_subject(payload)
 
-    def create_draft(self, to: str, subject: str, body: str) -> str:
-        """Create a draft addressed to ``to``; returns the draft message id."""
-        raw = build_raw_message(to, subject, body)
+    def create_draft(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        html_body: str | None = None,
+        attachments: list[dict] | None = None,
+    ) -> str:
+        """Create a draft addressed to ``to``; returns the draft message id.
+
+        ``html_body`` adds an HTML alternative part (so the signature's links and
+        images render); ``attachments`` adds files (e.g. the program/consent PDFs).
+        """
+        raw = build_raw_message(to, subject, body, html_body, attachments)
         draft = (
             self.service.users()
             .drafts()

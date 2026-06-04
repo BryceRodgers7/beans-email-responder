@@ -67,8 +67,11 @@ def generate_draft(
 ) -> str:
     """Generate the draft email body. ``client`` can be injected for testing.
 
-    Retries up to ``settings.max_retries`` times on any error, with simple
-    exponential backoff. Raises :class:`DraftError` on final failure.
+    Returns only the model's reply body; the business footer is resolved and
+    appended by the caller (``app.run``), since it comes from Gmail account
+    settings this module deliberately knows nothing about. Retries up to
+    ``settings.max_retries`` times on any error, with simple exponential
+    backoff. Raises :class:`DraftError` on final failure.
     """
     system_prompt = build_system_prompt(prompt_path, profile_path)
     user_message = build_user_message(fields)

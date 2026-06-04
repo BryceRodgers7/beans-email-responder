@@ -50,7 +50,9 @@ In <https://console.cloud.google.com> (recommended: signed in as the sister):
 3. **OAuth consent screen:**
    - User type **External**.
    - App name, support email, developer email (any valid values).
-   - **Scopes:** add `https://www.googleapis.com/auth/gmail.modify` only.
+   - **Scopes:** add `https://www.googleapis.com/auth/gmail.modify` and
+     `https://www.googleapis.com/auth/gmail.settings.basic` (the latter lets the
+     app read the account signature to use as the draft footer).
    - **Test users:** add the **sister's Gmail address**.
    - **Publish to Production** (the "Publishing status" → Publish App button).
      This avoids the 7-day refresh-token expiry that applies in "Testing" mode.
@@ -96,12 +98,37 @@ python -m app.run --dry-run     # sanity: config + which secrets are present
 python -m app.run               # one real pass: creates drafts, never sends
 ```
 
-Check the sister's Gmail: drafts appear under **Drafts** (subject prefixed
-`[AI Draft]`) and the inquiry moved from `Website Inquiries/New` to
-`Website Inquiries/AI Draft Created`. Review/edit/send each draft manually.
+Check the sister's Gmail: drafts appear under **Drafts** (subject
+`Re: your inquiry`, tagged `Website Inquiries/AI Assisted Drafts`) and the
+inquiry moved from `Website Inquiries/New` to `Website Inquiries/AI Draft
+Created`. Review/edit/send each draft manually.
+
+> **Footer:** drafts use the account's **Gmail signature** as the footer (Gmail
+> doesn't apply signatures to API-created drafts, so the app reads it via the
+> `gmail.settings.basic` scope and appends it). `config/signature.txt` is only a
+> fallback for when the signature can't be read. **If you added the settings
+> scope after first consenting, re-run `python -m app.auth_bootstrap`** so
+> `token.json` (and the `GMAIL_*` secrets) include the new scope — otherwise the
+> footer silently falls back to the file.
 
 > This is the moment the real Gmail API is exercised end-to-end for the first
 > time. Do this before relying on the schedule.
+
+**Draining a backlog:** each run processes at most `max_batch` (25) inquiries
+from `New`. If `New` has more, just run `python -m app.run` again until it
+reports `Found 0`.
+
+**Iterating on draft quality:** after editing `config/business_profile.md` or
+`config/prompt_template.md`, regenerate drafts for inquiries that previously
+failed or that you want to redo:
+
+```powershell
+python -m app.run --retry-errors   # moves Error-label inquiries back to New, then runs
+```
+
+This is the tune-the-prompt loop: tweak the profile/prompt → `--retry-errors` →
+review the new drafts in Gmail → repeat. (To redo inquiries that already drafted
+successfully, move them from `AI Draft Created` back to `New` in Gmail first.)
 
 ---
 

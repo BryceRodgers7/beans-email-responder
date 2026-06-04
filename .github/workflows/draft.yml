@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write   # allow committing the permanent error log back to the repo
 
 jobs:
   draft:
@@ -36,3 +36,16 @@ jobs:
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
         run: python -m app.run
+
+      - name: Persist error log
+        if: always()   # commit the log even if the drafter step failed
+        run: |
+          if [[ -n "$(git status --porcelain logs/error_log.tsv)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add logs/error_log.tsv
+            git commit -m "chore(logs): record drafter errors [skip ci]"
+            git push
+          else
+            echo "No new error-log entries to commit."
+          fi

@@ -7,6 +7,7 @@ from app.gmail_client import (
     build_raw_message,
     extract_plain_text,
     extract_subject,
+    pick_signature_html,
 )
 
 
@@ -66,6 +67,26 @@ def test_extract_subject():
     assert extract_subject(payload) == "New Form Entry #2011"
 
 
+def test_pick_signature_prefers_primary():
+    entries = [
+        {"sendAsEmail": "alias@x.com", "signature": "<div>Alias sig</div>"},
+        {"sendAsEmail": "me@x.com", "isPrimary": True, "signature": "<div>Primary sig</div>"},
+    ]
+    assert pick_signature_html(entries) == "<div>Primary sig</div>"
+
+
+def test_pick_signature_falls_back_to_any_nonempty():
+    entries = [
+        {"sendAsEmail": "me@x.com", "isPrimary": True, "signature": ""},
+        {"sendAsEmail": "alias@x.com", "signature": "<div>Alias sig</div>"},
+    ]
+    assert pick_signature_html(entries) == "<div>Alias sig</div>"
+
+
+def test_pick_signature_empty_when_none_set():
+    assert pick_signature_html([{"sendAsEmail": "me@x.com", "isPrimary": True}]) == ""
+
+
 def test_build_raw_message_roundtrips():
     raw = build_raw_message("client@example.com", "[AI Draft] Re: your inquiry", "Body text")
     decoded = base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")
@@ -74,3 +95,34 @@ def test_build_raw_message_roundtrips():
     assert "Body text" in decoded
     # We never set From (Gmail fills the authenticated account).
     assert "From:" not in decoded
+
+
+def test_build_raw_message_html_is_multipart_alternative():
+    raw = build_raw_message(
+        "client@example.com",
+        "Re: your inquiry",
+        "Body text",
+        "<p>Body text</p><div>Sig <a href='https://x.com'>link</a></div>",
+    )
+    decoded = base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")
+    assert "multipart/alternative" in decoded
+    assert "text/plain" in decoded and "text/html" in decoded
+    assert "Body text" in decoded  # plain-text fallback present
+    assert "https://x.com" in decoded  # signature link survives in the HTML part
+
+
+def test_build_raw_message_with_attachments_is_multipart_mixed():
+    raw = build_raw_message(
+        "client@example.com",
+        "Re: your inquiry",
+        "Body text",
+        "<p>Body text</p>",
+        attachments=[
+            {"data": b"%PDF-1.4 data", "maintype": "application", "subtype": "pdf", "filename": "doc.pdf"}
+        ],
+    )
+    decoded = base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")
+    assert "multipart/mixed" in decoded
+    assert "multipart/alternative" in decoded  # the body alternative is nested inside
+    assert "application/pdf" in decoded
+    assert 'filename="doc.pdf"' in decoded
