@@ -5,10 +5,12 @@ import base64
 
 from app.gmail_client import (
     build_raw_message,
+    extract_best_body,
     extract_plain_text,
     extract_subject,
     pick_signature_html,
 )
+from app.parser import parse
 
 
 def _b64url(text: str) -> str:
@@ -65,6 +67,44 @@ def test_extract_plain_text_html_fallback_strips_tags():
 def test_extract_subject():
     payload = {"headers": [{"name": "Subject", "value": "New Form Entry #2011"}]}
     assert extract_subject(payload) == "New Form Entry #2011"
+
+
+# The real notification is HTML-only with <li><b>Label</b> rows. extract_best_body
+# must return it RAW (not stripped) so the structural parser can read it — this is
+# the regression that made every original inquiry fall through to LLM extraction.
+REAL_HTML = (
+    "<p>You have a new website form submission: </p>\n<ol>\n"
+    "<li><b>Name</b><br />Rhoda Mina</li>\n"
+    '<li><b>Email</b><br /><a href="mailto:rhoda.mina@gmail.com">rhoda.mina@gmail.com</a></li>\n'
+    "<li><b>Phone</b><br />(904) 994-1382</li>\n"
+    "<li><b>Textarea</b>\n<p>Looking for info for my daughter.</p>\n<p></li>\n</ol>"
+)
+
+
+def test_extract_best_body_returns_raw_html_for_html_only():
+    payload = {"mimeType": "text/html", "body": {"data": _b64url(REAL_HTML)}}
+    body = extract_best_body(payload)
+    assert "<li>" in body and "<b>" in body  # raw, NOT stripped
+
+
+def test_extract_best_body_prefers_plain_text():
+    payload = {
+        "mimeType": "multipart/alternative",
+        "parts": [
+            {"mimeType": "text/html", "body": {"data": _b64url(REAL_HTML)}},
+            {"mimeType": "text/plain", "body": {"data": _b64url("PLAIN MARKERS")}},
+        ],
+    }
+    assert extract_best_body(payload) == "PLAIN MARKERS"
+
+
+def test_real_html_notification_parses_via_extract_best_body():
+    # End-to-end: the production body path feeds the parser, no LLM fallback.
+    payload = {"mimeType": "text/html", "body": {"data": _b64url(REAL_HTML)}}
+    fields = parse(extract_best_body(payload))
+    assert fields.email == "rhoda.mina@gmail.com"
+    assert fields.name == "Rhoda Mina"
+    assert fields.message and "daughter" in fields.message
 
 
 def test_pick_signature_prefers_primary():

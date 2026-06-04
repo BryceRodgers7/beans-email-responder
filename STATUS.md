@@ -30,9 +30,9 @@ app/
                     Console output groups lines per inquiry ([i/N] + subject,
                     not Gmail id). EVERY processed inquiry (drafted or errored) is
                     appended as one row to the permanent logs/process_log.tsv
-                    (timestamp, status, subject, email, message_id, error;
-                    committed by CI) + a $GITHUB_STEP_SUMMARY table. Flags:
-                    `--dry-run`, `--retry-errors`.
+                    (timestamp, status, extraction[parser|llm], subject, email,
+                    message_id, error; committed by CI) + a $GITHUB_STEP_SUMMARY
+                    table. Flags: `--dry-run`, `--retry-errors`.
   config.py         Loads config/settings.toml + secrets from env/.env → Settings.
   gmail_client.py   All Gmail I/O: OAuth creds (token.json local / env in CI),
                     ensure_labels, list_by_label, get body (base64url +

@@ -11,6 +11,7 @@ client email.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 
 from .config import Settings
@@ -70,7 +71,7 @@ def extract_with_llm(body: str, settings: Settings, *, client=None) -> InquiryFi
         for key in ("name", "email", "phone", "message")
         if data.get(key)
     }
-    fields = validate_and_build(collected)
+    fields = dataclasses.replace(validate_and_build(collected), extraction_method="llm")
     log.info("LLM extraction succeeded (recovered fields for %s)", fields.email)
     return fields
 
@@ -88,7 +89,9 @@ def extract_fields(body: str, settings: Settings, *, llm=extract_with_llm) -> In
             raise  # no LLM available — surface the deterministic failure
         log.info("Parser could not read inquiry (%s); trying LLM extraction", det_error)
         try:
-            return llm(body, settings)
+            # Force the marker even if a custom ``llm`` callable forgot it: by
+            # definition this path used the LLM.
+            return dataclasses.replace(llm(body, settings), extraction_method="llm")
         except ParseError as llm_error:
             log.warning("LLM extraction also failed: %s", llm_error)
             raise

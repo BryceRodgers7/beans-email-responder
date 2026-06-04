@@ -106,7 +106,7 @@ def _find_part(part: dict, mime_type: str) -> dict | None:
 
 
 def extract_plain_text(payload: dict) -> str:
-    """Extract the best plain-text body from a message payload."""
+    """Extract the best plain-text body from a message payload (HTML stripped)."""
     plain = _find_part(payload, "text/plain")
     if plain is not None:
         return _decode_part_body(plain)
@@ -114,6 +114,24 @@ def extract_plain_text(payload: dict) -> str:
     if html_part is not None:
         return _strip_html(_decode_part_body(html_part))
     # Single-part message: the body hangs off the payload itself.
+    return _decode_part_body(payload)
+
+
+def extract_best_body(payload: dict) -> str:
+    """Return the best body for PARSING — and crucially, NOT stripped.
+
+    Prefers the ``text/plain`` part (forwarded notifications carry the asterisk
+    ``N. *Label*`` markers there). Otherwise returns the RAW ``text/html`` part so
+    the structural ``<li><b>Label</b>`` parser can read the real notification
+    (which is HTML-only). The parser does its own HTML handling, so stripping
+    here — as ``extract_plain_text`` does — would destroy the structure it needs.
+    """
+    plain = _find_part(payload, "text/plain")
+    if plain is not None:
+        return _decode_part_body(plain)
+    html_part = _find_part(payload, "text/html")
+    if html_part is not None:
+        return _decode_part_body(html_part)  # raw HTML — parser will parse/strip
     return _decode_part_body(payload)
 
 
@@ -237,7 +255,7 @@ class GmailClient:
             .execute()
         )
         payload = msg.get("payload", {})
-        return extract_plain_text(payload), extract_subject(payload)
+        return extract_best_body(payload), extract_subject(payload)
 
     def create_draft(
         self,

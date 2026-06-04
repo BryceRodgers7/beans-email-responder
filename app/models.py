@@ -21,6 +21,8 @@ class InquiryFields:
     phone: str | None = None
     message: str | None = None
     missing_fields: list[str] = field(default_factory=list)
+    # How the fields were extracted: "parser" (deterministic) or "llm" (fallback).
+    extraction_method: str = "parser"
 
     def as_prompt_dict(self) -> dict[str, str]:
         """Render fields for prompt interpolation, with friendly blanks."""

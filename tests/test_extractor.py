@@ -56,6 +56,7 @@ def test_llm_extraction_builds_and_validates_fields(settings):
     assert result.email == "jane@gmail.com"
     assert result.name == "Jane"
     assert result.message == "hi there"
+    assert result.extraction_method == "llm"  # marks how it was extracted
     assert client.calls == 1
 
 
@@ -78,6 +79,7 @@ def test_extract_fields_uses_parser_first_no_llm(settings):
 
     result = extract_fields(HTML_FULL, settings, llm=boom_llm)
     assert result.email == "jane.sample@gmail.com"
+    assert result.extraction_method == "parser"  # parser handled it
 
 
 def test_extract_fields_falls_back_to_llm_when_parser_fails(settings_with_key):
@@ -85,11 +87,12 @@ def test_extract_fields_falls_back_to_llm_when_parser_fails(settings_with_key):
 
     def fake_llm(body, s):
         called["body"] = body
-        return InquiryFields(email="recovered@x.com")
+        return InquiryFields(email="recovered@x.com")  # note: no method set
 
     result = extract_fields(UNPARSEABLE, settings_with_key, llm=fake_llm)
     assert called["body"] == UNPARSEABLE
     assert result.email == "recovered@x.com"
+    assert result.extraction_method == "llm"  # orchestrator forces the marker
 
 
 def test_extract_fields_no_api_key_reraises_without_llm(settings):

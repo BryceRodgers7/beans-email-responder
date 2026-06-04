@@ -85,6 +85,7 @@ class ProcessRecord(NamedTuple):
     msg_id: str
     subject: str
     status: str  # "drafted" or "error"
+    extraction: str  # "parser", "llm", or "" if extraction never completed
     email: str  # customer email if known, else ""
     error: str  # error message if any, else ""
 
@@ -94,13 +95,13 @@ def _sanitize(value: str) -> str:
     return value.replace("\t", " ").replace("\r", " ").replace("\n", " ").strip()
 
 
-PROCESS_LOG_HEADER = "timestamp\tstatus\tsubject\temail\tmessage_id\terror\n"
+PROCESS_LOG_HEADER = "timestamp\tstatus\textraction\tsubject\temail\tmessage_id\terror\n"
 
 
 def append_process_log(record: ProcessRecord, path: Path = PROCESS_LOG_PATH) -> None:
     """Append one processed inquiry to the permanent TSV log (one row per email:
-    UTC timestamp, status, subject, customer email, message id, error). Writes a
-    header row when creating the file."""
+    UTC timestamp, status, extraction method, subject, customer email, message
+    id, error). Writes a header row when creating the file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     write_header = not path.exists()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -108,6 +109,7 @@ def append_process_log(record: ProcessRecord, path: Path = PROCESS_LOG_PATH) -> 
         [
             timestamp,
             record.status,
+            record.extraction,
             _sanitize(record.subject),
             _sanitize(record.email),
             record.msg_id,
@@ -133,12 +135,16 @@ def write_step_summary(records: list[ProcessRecord]) -> None:
         "",
         f"Processed {len(records)} inquiry(ies): **{drafted} drafted, {errored} errored**.",
     ]
+    llm_used = sum(1 for r in records if r.extraction == "llm")
+    if llm_used:
+        lines.append(f"({llm_used} needed LLM extraction — the parser couldn't read them.)")
     if records:
-        lines += ["", "| Status | Subject | Email | Error |", "| --- | --- | --- | --- |"]
+        lines += ["", "| Status | Extraction | Subject | Email | Error |", "| --- | --- | --- | --- | --- |"]
         for r in records:
             status = "✅ drafted" if r.status == "drafted" else "⚠️ error"
             lines.append(
-                f"| {status} | {_sanitize(r.subject)} | {_sanitize(r.email)} | {_sanitize(r.error)} |"
+                f"| {status} | {r.extraction or '—'} | {_sanitize(r.subject)} | "
+                f"{_sanitize(r.email)} | {_sanitize(r.error)} |"
             )
     with open(summary_path, "a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -247,29 +253,33 @@ def run_once(
         if on_processed is not None:
             on_processed(rec)
 
-    def errored_out(idx, msg_id, subject, email, stage, error, severe) -> None:
+    def errored_out(idx, msg_id, subject, extraction, email, stage, error, severe) -> None:
         nonlocal errored
         errored += 1
         (log.error if severe else log.warning)(
             "[%d/%d]   -> ERROR (%s): %s  (moved to Error)", idx, total, stage, error
         )
         client.move(msg_id, [error_id], [new_id])
-        record(ProcessRecord(msg_id, subject, "error", email, f"{stage}: {error}"))
+        record(ProcessRecord(msg_id, subject, "error", extraction, email, f"{stage}: {error}"))
 
     for idx, msg_id in enumerate(msg_ids, start=1):
         inquiry_subject = ""
         customer_email = ""
+        extraction = ""
         # --- read + parse (failures are safe: route to Error) ---
         try:
             body, inquiry_subject = client.get_text_and_subject(msg_id)
             log.info("[%d/%d] Inquiry: %r", idx, total, inquiry_subject or "(no subject)")
             fields = extract(body, settings)
             customer_email = fields.email
+            extraction = fields.extraction_method
+            if extraction == "llm":
+                log.info("[%d/%d]   (parser couldn't read it; used LLM extraction)", idx, total)
         except ParseError as error:
-            errored_out(idx, msg_id, inquiry_subject, customer_email, "parse", error, severe=False)
+            errored_out(idx, msg_id, inquiry_subject, extraction, customer_email, "parse", error, severe=False)
             continue
         except Exception as error:  # noqa: BLE001
-            errored_out(idx, msg_id, inquiry_subject, customer_email, "read", error, severe=True)
+            errored_out(idx, msg_id, inquiry_subject, extraction, customer_email, "read", error, severe=True)
             continue
 
         # --- draft + create + relabel ---
@@ -296,9 +306,9 @@ def run_once(
             client.move(msg_id, [done_id], [new_id])
             drafted += 1
             log.info("[%d/%d]   -> drafted reply to %s", idx, total, customer_email)
-            record(ProcessRecord(msg_id, inquiry_subject, "drafted", customer_email, ""))
+            record(ProcessRecord(msg_id, inquiry_subject, "drafted", extraction, customer_email, ""))
         except Exception as error:  # noqa: BLE001
-            errored_out(idx, msg_id, inquiry_subject, customer_email, "draft", error, severe=True)
+            errored_out(idx, msg_id, inquiry_subject, extraction, customer_email, "draft", error, severe=True)
 
     log.info("=== Run complete: drafted=%d errored=%d ===", drafted, errored)
     return drafted, errored

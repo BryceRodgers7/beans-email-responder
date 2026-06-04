@@ -223,27 +223,37 @@ def test_run_once_records_every_inquiry_with_subject_and_outcome(settings):
     ok = by_status["drafted"]
     assert ok.subject == "New Form Entry #2011"  # subject, not the opaque id
     assert ok.email == "jane.sample@gmail.com"  # customer email captured
+    assert ok.extraction == "parser"  # deterministic parse, no LLM needed
     assert ok.error == ""
 
     bad = by_status["error"]
     assert bad.subject == "New Form Entry #2099"
     assert bad.email == ""  # unknown for an unparseable inquiry
+    assert bad.extraction == ""  # extraction never completed
     assert "parse" in bad.error
 
 
 def test_append_process_log_writes_one_row_per_email(tmp_path):
     path = tmp_path / "logs" / "process_log.tsv"
     append_process_log(
-        ProcessRecord("2011", "New Form Entry #2011", "drafted", "jane@x.com", ""), path=path
+        ProcessRecord("2011", "New Form Entry #2011", "drafted", "parser", "jane@x.com", ""),
+        path=path,
     )
     append_process_log(
-        ProcessRecord("2099", "New Form Entry #2099", "error", "", "parse: no email"), path=path
+        ProcessRecord("2012", "New Form Entry #2012", "drafted", "llm", "sam@x.com", ""), path=path
+    )
+    append_process_log(
+        ProcessRecord("2099", "New Form Entry #2099", "error", "", "", "parse: no email"), path=path
     )
     lines = path.read_text(encoding="utf-8").strip().splitlines()
-    assert lines[0] == "timestamp\tstatus\tsubject\temail\tmessage_id\terror"
-    assert lines[1].split("\t")[1:] == ["drafted", "New Form Entry #2011", "jane@x.com", "2011", ""]
-    assert lines[2].split("\t")[1:] == ["error", "New Form Entry #2099", "", "2099", "parse: no email"]
-    assert len(lines) == 3  # header + one row per email
+    assert lines[0] == "timestamp\tstatus\textraction\tsubject\temail\tmessage_id\terror"
+    assert lines[1].split("\t")[1:] == [
+        "drafted", "parser", "New Form Entry #2011", "jane@x.com", "2011", ""
+    ]
+    assert lines[2].split("\t")[2] == "llm"  # extraction method recorded
+    assert lines[3].split("\t")[1:] == [
+        "error", "", "New Form Entry #2099", "", "2099", "parse: no email"
+    ]
 
 
 def test_load_attachments_reads_files_with_mimetypes(tmp_path):
