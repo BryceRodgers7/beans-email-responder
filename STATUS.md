@@ -27,10 +27,12 @@ app/
   run.py            Orchestration: run_once() = list New → parse → draft →
                     create draft → label draft → relabel inquiry (New→Done,
                     or →Error on failure). Per-message failures are isolated.
-                    Console output identifies inquiries by SUBJECT (unique form
-                    number), not Gmail id. Errors are appended to the permanent
-                    logs/error_log.tsv (committed by CI) + a $GITHUB_STEP_SUMMARY
-                    table. Flags: `--dry-run`, `--retry-errors`.
+                    Console output groups lines per inquiry ([i/N] + subject,
+                    not Gmail id). EVERY processed inquiry (drafted or errored) is
+                    appended as one row to the permanent logs/process_log.tsv
+                    (timestamp, status, subject, email, message_id, error;
+                    committed by CI) + a $GITHUB_STEP_SUMMARY table. Flags:
+                    `--dry-run`, `--retry-errors`.
   config.py         Loads config/settings.toml + secrets from env/.env → Settings.
   gmail_client.py   All Gmail I/O: OAuth creds (token.json local / env in CI),
                     ensure_labels, list_by_label, get body (base64url +

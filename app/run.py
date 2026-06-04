@@ -25,9 +25,9 @@ from .parser import ParseError, _strip_html
 log = get_logger()
 
 ROOT = Path(__file__).resolve().parent.parent
-# Permanent, append-only record of inquiries that errored (committed by CI so it
-# survives GitHub Actions' log retention). Subjects are non-PII form numbers.
-ERROR_LOG_PATH = ROOT / "logs" / "error_log.tsv"
+# Permanent, append-only record of EVERY inquiry we attempt to process (one row
+# each), committed by CI so it survives GitHub Actions' log retention.
+PROCESS_LOG_PATH = ROOT / "logs" / "process_log.tsv"
 # Manual fallback footer used only when the Gmail account signature is
 # unavailable (settings scope not granted, API error, or no signature set).
 SIGNATURE_PATH = ROOT / "config" / "signature.txt"
@@ -79,12 +79,14 @@ def load_attachments(directory: Path = ATTACHMENTS_DIR) -> list[dict]:
     return items
 
 
-class ErrorRecord(NamedTuple):
-    """One inquiry that failed to draft: its Gmail id, subject, and the reason."""
+class ProcessRecord(NamedTuple):
+    """One processed inquiry: outcome + details for the permanent log."""
 
     msg_id: str
     subject: str
-    reason: str
+    status: str  # "drafted" or "error"
+    email: str  # customer email if known, else ""
+    error: str  # error message if any, else ""
 
 
 def _sanitize(value: str) -> str:
@@ -92,33 +94,52 @@ def _sanitize(value: str) -> str:
     return value.replace("\t", " ").replace("\r", " ").replace("\n", " ").strip()
 
 
-def append_error_log(record: ErrorRecord, path: Path = ERROR_LOG_PATH) -> None:
-    """Append one errored inquiry to the permanent TSV log (UTC timestamp,
-    subject, message id, reason). Writes a header row when creating the file."""
+PROCESS_LOG_HEADER = "timestamp\tstatus\tsubject\temail\tmessage_id\terror\n"
+
+
+def append_process_log(record: ProcessRecord, path: Path = PROCESS_LOG_PATH) -> None:
+    """Append one processed inquiry to the permanent TSV log (one row per email:
+    UTC timestamp, status, subject, customer email, message id, error). Writes a
+    header row when creating the file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     write_header = not path.exists()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = "\t".join(
+        [
+            timestamp,
+            record.status,
+            _sanitize(record.subject),
+            _sanitize(record.email),
+            record.msg_id,
+            _sanitize(record.error),
+        ]
+    )
     with path.open("a", encoding="utf-8") as handle:
         if write_header:
-            handle.write("timestamp\tsubject\tmessage_id\treason\n")
-        handle.write(
-            f"{timestamp}\t{_sanitize(record.subject)}\t{record.msg_id}\t{_sanitize(record.reason)}\n"
-        )
+            handle.write(PROCESS_LOG_HEADER)
+        handle.write(row + "\n")
 
 
-def write_step_summary(records: list[ErrorRecord]) -> None:
-    """When running in GitHub Actions, write a Markdown summary of errored
-    subjects to the run's summary page (the $GITHUB_STEP_SUMMARY file)."""
+def write_step_summary(records: list[ProcessRecord]) -> None:
+    """When running in GitHub Actions, write a Markdown summary of every
+    processed inquiry to the run's summary page (the $GITHUB_STEP_SUMMARY file)."""
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         return
-    lines = ["## Email drafter run", ""]
-    if not records:
-        lines.append("✅ No errored inquiries this run.")
-    else:
-        lines.append(f"⚠️ {len(records)} inquiry(ies) errored:")
-        lines += ["", "| Subject | Reason |", "| --- | --- |"]
-        lines += [f"| {_sanitize(r.subject)} | {_sanitize(r.reason)} |" for r in records]
+    drafted = sum(1 for r in records if r.status == "drafted")
+    errored = sum(1 for r in records if r.status == "error")
+    lines = [
+        "## Email drafter run",
+        "",
+        f"Processed {len(records)} inquiry(ies): **{drafted} drafted, {errored} errored**.",
+    ]
+    if records:
+        lines += ["", "| Status | Subject | Email | Error |", "| --- | --- | --- | --- |"]
+        for r in records:
+            status = "✅ drafted" if r.status == "drafted" else "⚠️ error"
+            lines.append(
+                f"| {status} | {_sanitize(r.subject)} | {_sanitize(r.email)} | {_sanitize(r.error)} |"
+            )
     with open(summary_path, "a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
 
@@ -192,7 +213,7 @@ def run_once(
     footer: Footer = Footer(),
     template: Template = Template(),
     attachments: list[dict] | None = None,
-    on_error: Callable[["ErrorRecord"], None] | None = None,
+    on_processed: Callable[["ProcessRecord"], None] | None = None,
 ) -> tuple[int, int]:
     """Process one batch. ``client``, ``generate`` and ``extract`` are injectable
     for tests.
@@ -201,9 +222,9 @@ def run_once(
     the fixed ``template`` body + the ``footer`` (signature), with ``attachments``
     (PDFs) added. When an HTML form exists, the draft is sent as HTML + plain-text.
 
-    Console output identifies each inquiry by its (unique) subject, not the
-    opaque Gmail id. ``on_error`` is called with an :class:`ErrorRecord` for every
-    failed inquiry (used to persist them).
+    Console output groups lines per inquiry with an ``[i/N]`` tag and identifies
+    each by its (unique) subject, not the opaque Gmail id. ``on_processed`` is
+    called with a :class:`ProcessRecord` for EVERY inquiry (drafted or errored).
 
     Per-message failures are isolated: the inquiry is moved to the Error label
     and the run continues. Returns (drafted, errored) counts.
@@ -217,30 +238,38 @@ def run_once(
     drafts_id = labels[settings.label_drafts]
 
     msg_ids = client.list_message_ids(new_id, settings.max_batch)
-    log.info("Found %d inquiry message(s) under %r", len(msg_ids), settings.label_new)
+    total = len(msg_ids)
+    log.info("=== Found %d inquiry message(s) under %r ===", total, settings.label_new)
 
     drafted = errored = 0
 
-    def fail(msg_id: str, subject: str, stage: str, error: Exception) -> None:
-        nonlocal errored
-        shown = subject or "(no subject)"
-        log.warning("%s failed for inquiry %r: %s — moving to Error", stage, shown, error)
-        client.move(msg_id, [error_id], [new_id])
-        errored += 1
-        if on_error is not None:
-            on_error(ErrorRecord(msg_id=msg_id, subject=shown, reason=f"{stage}: {error}"))
+    def record(rec: ProcessRecord) -> None:
+        if on_processed is not None:
+            on_processed(rec)
 
-    for msg_id in msg_ids:
+    def errored_out(idx, msg_id, subject, email, stage, error, severe) -> None:
+        nonlocal errored
+        errored += 1
+        (log.error if severe else log.warning)(
+            "[%d/%d]   -> ERROR (%s): %s  (moved to Error)", idx, total, stage, error
+        )
+        client.move(msg_id, [error_id], [new_id])
+        record(ProcessRecord(msg_id, subject, "error", email, f"{stage}: {error}"))
+
+    for idx, msg_id in enumerate(msg_ids, start=1):
         inquiry_subject = ""
+        customer_email = ""
         # --- read + parse (failures are safe: route to Error) ---
         try:
             body, inquiry_subject = client.get_text_and_subject(msg_id)
+            log.info("[%d/%d] Inquiry: %r", idx, total, inquiry_subject or "(no subject)")
             fields = extract(body, settings)
+            customer_email = fields.email
         except ParseError as error:
-            fail(msg_id, inquiry_subject, "Parse", error)
+            errored_out(idx, msg_id, inquiry_subject, customer_email, "parse", error, severe=False)
             continue
         except Exception as error:  # noqa: BLE001
-            fail(msg_id, inquiry_subject, "Read", error)
+            errored_out(idx, msg_id, inquiry_subject, customer_email, "read", error, severe=True)
             continue
 
         # --- draft + create + relabel ---
@@ -263,14 +292,15 @@ def run_once(
             try:
                 client.apply_label(draft_msg_id, drafts_id)
             except Exception as error:  # noqa: BLE001 - non-fatal labeling of the draft
-                log.warning("Could not label draft for inquiry %r: %s", inquiry_subject, error)
+                log.warning("[%d/%d]   -> (warning) could not label draft: %s", idx, total, error)
             client.move(msg_id, [done_id], [new_id])
             drafted += 1
-            log.info("Drafted reply for inquiry %r", inquiry_subject or "(no subject)")
+            log.info("[%d/%d]   -> drafted reply to %s", idx, total, customer_email)
+            record(ProcessRecord(msg_id, inquiry_subject, "drafted", customer_email, ""))
         except Exception as error:  # noqa: BLE001
-            fail(msg_id, inquiry_subject, "Draft", error)
+            errored_out(idx, msg_id, inquiry_subject, customer_email, "draft", error, severe=True)
 
-    log.info("Run complete: drafted=%d errored=%d", drafted, errored)
+    log.info("=== Run complete: drafted=%d errored=%d ===", drafted, errored)
     return drafted, errored
 
 
@@ -364,11 +394,11 @@ def main(argv: list[str] | None = None) -> int:
         ", ".join(a["filename"] for a in attachments) or "(none)",
     )
 
-    run_errors: list[ErrorRecord] = []
+    processed: list[ProcessRecord] = []
 
-    def record_error(record: ErrorRecord) -> None:
-        run_errors.append(record)
-        append_error_log(record)  # permanent, append-only TSV (committed by CI)
+    def record_processed(record: ProcessRecord) -> None:
+        processed.append(record)
+        append_process_log(record)  # permanent, append-only TSV (committed by CI)
 
     run_once(
         client,
@@ -376,9 +406,9 @@ def main(argv: list[str] | None = None) -> int:
         footer=footer,
         template=template,
         attachments=attachments,
-        on_error=record_error,
+        on_processed=record_processed,
     )
-    write_step_summary(run_errors)
+    write_step_summary(processed)
     return 0
 
 

@@ -7,10 +7,10 @@ import pytest
 
 from app.config import load_settings
 from app.run import (
-    ErrorRecord,
     Footer,
+    ProcessRecord,
     Template,
-    append_error_log,
+    append_process_log,
     build_draft_subject,
     load_attachments,
     load_file_footer,
@@ -208,33 +208,42 @@ def test_resolve_footer_falls_back_when_scope_missing(settings):
     assert resolve_footer(client, settings) == Footer()
 
 
-def test_run_once_reports_errored_subject_via_callback(settings):
-    client = FakeGmailClient({"2011": JUNK_BODY})
-    seen: list[ErrorRecord] = []
-    drafted, errored = run_once(client, settings, generate=lambda f, s: "x", on_error=seen.append)
+def test_run_once_records_every_inquiry_with_subject_and_outcome(settings):
+    # One good (drafts) + one junk (errors). Both must be recorded, one row each.
+    client = FakeGmailClient({"2011": VALID_BODY, "2099": JUNK_BODY})
+    seen: list[ProcessRecord] = []
+    drafted, errored = run_once(
+        client, settings, generate=lambda f, s: "opening", on_processed=seen.append
+    )
 
-    assert (drafted, errored) == (0, 1)
-    assert len(seen) == 1
-    assert seen[0].subject == "New Form Entry #2011"  # subject, not the opaque id
-    assert "Parse" in seen[0].reason
+    assert (drafted, errored) == (1, 1)
+    assert len(seen) == 2  # every processed inquiry recorded
+    by_status = {r.status: r for r in seen}
+
+    ok = by_status["drafted"]
+    assert ok.subject == "New Form Entry #2011"  # subject, not the opaque id
+    assert ok.email == "jane.sample@gmail.com"  # customer email captured
+    assert ok.error == ""
+
+    bad = by_status["error"]
+    assert bad.subject == "New Form Entry #2099"
+    assert bad.email == ""  # unknown for an unparseable inquiry
+    assert "parse" in bad.error
 
 
-def test_run_once_no_callback_on_success(settings):
-    client = FakeGmailClient({"2012": VALID_BODY})
-    seen: list[ErrorRecord] = []
-    run_once(client, settings, generate=lambda f, s: "ok", on_error=seen.append)
-    assert seen == []  # success path never records an error
-
-
-def test_append_error_log_writes_tsv_with_header(tmp_path):
-    path = tmp_path / "logs" / "error_log.tsv"
-    append_error_log(ErrorRecord("2011", "New Form Entry #2011", "Parse: no fields"), path=path)
-    append_error_log(ErrorRecord("2012", "New Form Entry #2012", "Draft: boom"), path=path)
+def test_append_process_log_writes_one_row_per_email(tmp_path):
+    path = tmp_path / "logs" / "process_log.tsv"
+    append_process_log(
+        ProcessRecord("2011", "New Form Entry #2011", "drafted", "jane@x.com", ""), path=path
+    )
+    append_process_log(
+        ProcessRecord("2099", "New Form Entry #2099", "error", "", "parse: no email"), path=path
+    )
     lines = path.read_text(encoding="utf-8").strip().splitlines()
-    assert lines[0] == "timestamp\tsubject\tmessage_id\treason"
-    assert "New Form Entry #2011" in lines[1] and "Parse: no fields" in lines[1]
-    assert "New Form Entry #2012" in lines[2]
-    assert len(lines) == 3  # header + 2 records
+    assert lines[0] == "timestamp\tstatus\tsubject\temail\tmessage_id\terror"
+    assert lines[1].split("\t")[1:] == ["drafted", "New Form Entry #2011", "jane@x.com", "2011", ""]
+    assert lines[2].split("\t")[1:] == ["error", "New Form Entry #2099", "", "2099", "parse: no email"]
+    assert len(lines) == 3  # header + one row per email
 
 
 def test_load_attachments_reads_files_with_mimetypes(tmp_path):

@@ -37,15 +37,15 @@ jobs:
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
         run: python -m app.run
 
-      - name: Persist error log
+      - name: Persist process log
         if: always()   # commit the log even if the drafter step failed
         run: |
-          if [[ -n "$(git status --porcelain logs/error_log.tsv)" ]]; then
+          if [[ -n "$(git status --porcelain logs/process_log.tsv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add logs/error_log.tsv
-            git commit -m "chore(logs): record drafter errors [skip ci]"
+            git add logs/process_log.tsv
+            git commit -m "chore(logs): record drafter run [skip ci]"
             git push
           else
-            echo "No new error-log entries to commit."
+            echo "No new process-log entries to commit."
           fi
