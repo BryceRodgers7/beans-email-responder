@@ -43,13 +43,13 @@ must match `config/settings.toml`.
 
 This is the piece that actually feeds the app. The contact-form notifications
 arrive **From** `noreply@thementalgain.com` with a **Subject** like
-`New Form Entry #2011 for contact me`.
+`Contact me #2011 for contact me`.
 
 1. Gmail → Settings ⚙ → **See all settings** → **Filters and Blocked Addresses**
    → **Create a new filter**.
 2. Fill in the match criteria. Use the sender (most reliable):
    - **From:** `noreply@thementalgain.com`
-   - *(optional, to be stricter)* **Subject:** `New Form Entry`
+   - *(optional, to be stricter)* **Subject:** `Contact me`
 3. Click **Create filter**.
 4. On the next screen, check:
    - ☑ **Apply the label:** choose `Website Inquiries/New`

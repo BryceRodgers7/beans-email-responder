@@ -29,7 +29,7 @@ In the sister's Gmail:
 1. Create the filter that routes inquiries:
    - Settings → Filters and Blocked Addresses → **Create a new filter**.
    - **From:** `noreply@thementalgain.com`
-   - **Has the words:** `subject:("New Form Entry")`
+   - **Has the words:** `subject:("Contact me")`
    - Create filter → **Apply the label** → create/choose `Website Inquiries/New`
      → (optionally **Skip the Inbox**) → also tick **Also apply to matching
      conversations** to backfill existing inquiries.

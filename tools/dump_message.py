@@ -6,7 +6,7 @@ robust parser against ground truth instead of a forwarded re-rendering.
 
 Usage:
   python -m tools.dump_message                          # newest default match
-  python -m tools.dump_message --query 'subject:"New Form Entry"'
+  python -m tools.dump_message --query 'subject:"Contact me"'
   python -m tools.dump_message --id <gmailMessageId>
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
 
 # Broad query so it finds the notification however the label is set up.
-DEFAULT_QUERY = 'from:noreply@thementalgain.com OR subject:"New Form Entry"'
+DEFAULT_QUERY = 'from:noreply@thementalgain.com OR subject:"Contact me"'
 
 
 def _structure(part: dict, indent: int = 0, lines: list[str] | None = None) -> list[str]:

@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 class InquiryFields:
     """Structured result of parsing an inquiry email body.
 
-    Mirrors the real "The Mental Gain" contact form, which collects Name,
-    Email, Phone and a free-text message (the form's "Textarea" field).
+    Mirrors the real "The Mental Gain" contact form, which collects two Name
+    fields (the parent/guardian first, then the child/athlete), Email, Phone and
+    a free-text message (the form's "Textarea" field).
 
     ``email`` is required (a draft cannot be addressed without it). All other
     fields are optional; absent ones are listed in ``missing_fields`` so the
@@ -18,6 +19,7 @@ class InquiryFields:
 
     email: str
     name: str | None = None
+    child_name: str | None = None
     phone: str | None = None
     message: str | None = None
     missing_fields: list[str] = field(default_factory=list)
@@ -28,6 +30,7 @@ class InquiryFields:
         """Render fields for prompt interpolation, with friendly blanks."""
         return {
             "name": self.name or "(not provided)",
+            "child_name": self.child_name or "(not provided)",
             "email": self.email,
             "phone": self.phone or "(not provided)",
             "message": self.message or "(not provided)",

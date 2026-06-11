@@ -23,7 +23,9 @@ log = get_logger()
 
 _EXTRACTION_SYSTEM = (
     "You extract fields from a website contact-form notification email. "
-    "Return ONLY a JSON object with exactly these keys: name, email, phone, message. "
+    "Return ONLY a JSON object with exactly these keys: name, child_name, email, phone, message. "
+    "The form has two name fields in order: 'name' is the first (the parent/guardian) "
+    "and 'child_name' is the second (the child/athlete). "
     "Copy values verbatim from the email; if a field is absent use null. "
     "Never invent or guess an email address — copy it exactly or use null. "
     "'message' is the free-text inquiry the visitor wrote. "
@@ -68,7 +70,7 @@ def extract_with_llm(body: str, settings: Settings, *, client=None) -> InquiryFi
 
     collected = {
         key: str(data[key]).strip()
-        for key in ("name", "email", "phone", "message")
+        for key in ("name", "child_name", "email", "phone", "message")
         if data.get(key)
     }
     fields = dataclasses.replace(validate_and_build(collected), extraction_method="llm")

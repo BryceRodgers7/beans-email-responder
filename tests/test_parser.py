@@ -14,7 +14,7 @@ EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 # value on the following line; "Textarea" is the free-text message).
 FULL = """\
 From: The Mental Gain <noreply@thementalgain.com>
-Subject: New Form Entry #2099 for contact me
+Subject: Contact me #2099 for contact me
 To: <info@thementalgain.com>
 
 You have a new website form submission:
@@ -93,13 +93,46 @@ HTML_BUSINESS_EMAIL = """\
 </ol>
 """
 
+# The current live format: TWO filled Name rows — first the parent, second the
+# child/athlete — then Email, Phone and Textarea.
+HTML_TWO_NAMES = """\
+<p>You have a new website form submission: </p>
+<ol>
+<li><b>Name</b><br />Pat Parent</li>
+<li><b>Name</b><br />Kim Kiddo</li>
+<li><b>Email</b><br /><a href="mailto:pat.parent@gmail.com">pat.parent@gmail.com</a></li>
+<li><b>Phone</b><br />(555) 010-0102</li>
+<li><b>Textarea</b>
+<p>Hi, I'd love to know more about your services for my daughter.</p>
+<p></li>
+</ol>
+"""
+
+# The marker layout can likewise carry both names.
+MARKER_TWO_NAMES = """\
+You have a new website form submission:
+
+   1. *Name*
+   Pat Parent
+   2. *Name*
+   Kim Kiddo
+   3. *Email*
+   pat.parent@gmail.com
+   4. *Phone*
+   (555) 010-0102
+   5. *Textarea*
+
+   Hi, I'd love to know more about your services for my daughter.
+"""
+
 
 def test_parses_all_fields():
     result = parse(FULL)
     assert result.name == "Jane Sample"
     assert result.email == "jane.sample@gmail.com"
     assert result.phone == "(555) 010-0100"
-    assert result.missing_fields == []
+    # Single-name fixture: only the (optional) child name is absent.
+    assert result.missing_fields == ["child_name"]
 
 
 def test_parses_real_html_notification():
@@ -110,7 +143,33 @@ def test_parses_real_html_notification():
     assert result.message is not None
     assert result.message.startswith("My daughter plays volleyball")
     assert "Thanks!" in result.message
+    assert result.missing_fields == ["child_name"]
+
+
+def test_html_two_names_parent_and_child():
+    result = parse(HTML_TWO_NAMES)
+    assert result.name == "Pat Parent"  # first Name = parent/guardian
+    assert result.child_name == "Kim Kiddo"  # second Name = child/athlete
+    assert result.email == "pat.parent@gmail.com"
+    assert result.phone == "(555) 010-0102"
+    assert result.message is not None
     assert result.missing_fields == []
+
+
+def test_marker_two_names_parent_and_child():
+    result = parse(MARKER_TWO_NAMES)
+    assert result.name == "Pat Parent"
+    assert result.child_name == "Kim Kiddo"
+    assert result.email == "pat.parent@gmail.com"
+    assert result.missing_fields == []
+
+
+def test_single_name_leaves_child_name_missing():
+    # Backward compatible: the older single-name format flags child_name missing.
+    result = parse(HTML_FULL)
+    assert result.name == "Jane Sample"
+    assert result.child_name is None
+    assert "child_name" in result.missing_fields
 
 
 def test_html_missing_optional_field_is_flagged():

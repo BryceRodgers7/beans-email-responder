@@ -182,7 +182,7 @@ One-time, in Google Cloud Console (free):
 5. **Create the labels** in Gmail (or let the app auto-create them on first run): `Website Inquiries/New`, `.../AI Draft Created`, `.../Error`, `.../AI Assisted Drafts`.
 6. **Create the Gmail filter** that routes inquiries to `Website Inquiries/New`:
    - Settings → Filters → Create filter.
-   - Match the real notification: **From** `noreply@thementalgain.com` **and** **Subject contains** `New Form Entry` (subjects look like `New Form Entry #2011 for contact me`). Using both the sender and subject avoids false positives.
+   - Match the real notification: **From** `noreply@thementalgain.com` **and** **Subject contains** `Contact me` (subjects look like `Contact me #2011 for contact me`). Using both the sender and subject avoids false positives.
    - Action: **Apply label** `Website Inquiries/New`, and optionally **Skip the Inbox**.
 
 > Scope note: `gmail.modify` is the minimum that covers list + read + modify-labels + drafts.create. We intentionally do **not** request `gmail.send`, so the app is structurally incapable of sending.

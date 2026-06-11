@@ -82,7 +82,7 @@ pip install -r requirements.txt          # installs the Google API libraries
 python -m app.auth_bootstrap
 
 # 3. In Gmail: create a filter (From: noreply@thementalgain.com AND
-#    Subject contains "New Form Entry") that applies the label
+#    Subject contains "Contact me") that applies the label
 #    "Website Inquiries/New". (The app auto-creates the other labels.)
 
 # 4. Run one pass against your inbox (creates drafts, never sends):

@@ -65,8 +65,8 @@ def test_extract_plain_text_html_fallback_strips_tags():
 
 
 def test_extract_subject():
-    payload = {"headers": [{"name": "Subject", "value": "New Form Entry #2011"}]}
-    assert extract_subject(payload) == "New Form Entry #2011"
+    payload = {"headers": [{"name": "Subject", "value": "Contact me #2011"}]}
+    assert extract_subject(payload) == "Contact me #2011"
 
 
 # The real notification is HTML-only with <li><b>Label</b> rows. extract_best_body

@@ -60,6 +60,16 @@ def test_llm_extraction_builds_and_validates_fields(settings):
     assert client.calls == 1
 
 
+def test_llm_extraction_captures_parent_and_child_names(settings):
+    client = FakeOpenAI(
+        '{"name": "Pat Parent", "child_name": "Kim Kiddo", "email": "pat@gmail.com"}'
+    )
+    result = extract_with_llm("anything", settings, client=client)
+    assert result.name == "Pat Parent"
+    assert result.child_name == "Kim Kiddo"
+    assert result.email == "pat@gmail.com"
+
+
 def test_llm_extraction_rejects_business_email(settings):
     client = FakeOpenAI('{"name": "X", "email": "info@thementalgain.com"}')
     with pytest.raises(ParseError):

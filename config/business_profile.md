@@ -15,6 +15,24 @@ parents on behalf of their child).
 - Contact email: info@thementalgain.com
 - TODO: confirm one or two sentences describing the practice and its approach.
 
+## What athletes come to us for
+Sabrina's core specialty — and what roughly **80% of her athletes** seek her help
+for — is building **confidence** and **getting over / bouncing back from
+mistakes**. Concerns that fall inside this focus area include (non-exhaustive):
+- low confidence, self-doubt, playing tentatively, "not trusting it"
+- dwelling on mistakes, can't shake a bad play/game, replaying errors
+- fear of failure or of letting others (coach, parents, team) down
+- perfectionism tied to mistakes
+- nerves, pressure, or "choking" in big moments driven by fear of messing up
+- negative self-talk after errors
+
+Concerns OUTSIDE this focus area — for which we must NOT claim she "works with
+many athletes on this" or "sees a lot of it" — include, for example: focus and
+attention, motivation or burnout, time management, team conflict or
+communication, injury-recovery mindset, and sport-specific skill coaching. For
+these, acknowledge the concern warmly and say she is happy to help, without
+implying it is something she sees often.
+
 ## What we offer
 The detailed services, session formats, pricing, and booking link live in the
 FIXED template body (`config/template_body.*`), which is appended to every draft

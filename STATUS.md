@@ -98,7 +98,7 @@ Not done yet (intentionally or blocked):
 - **OpenAI API key** not yet on the sister's machine (user will transfer it
   safely; goes in `.env` as `OPENAI_API_KEY`).
 - **Gmail filter + labels** not created yet (filter: From `noreply@thementalgain.com`
-  AND subject contains `New Form Entry` → apply `Website Inquiries/New`).
+  AND subject contains `Contact me` → apply `Website Inquiries/New`).
 - **No real `python -m app.run` end-to-end run has happened yet.**
 - **GitHub Actions secrets / schedule:** deliberately deferred. User does NOT
   want scheduling yet — wants to run manually and tune the prompt first.
