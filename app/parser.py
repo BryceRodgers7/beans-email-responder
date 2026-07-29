@@ -1,24 +1,23 @@
 """Parse a website-inquiry email body into structured fields.
 
-Pure functions, no I/O. Handles the two layouts we've seen from the
-"The Mental Gain" contact form:
+Pure functions, no I/O. The live "The Mental Gain" contact form emits an
+``text/html`` notification: an ``<ol>`` whose every field is an ``<li>`` with a
+bold label followed by the value::
 
-1. The REAL notification Gmail delivers — **HTML**, each field an ``<li>`` whose
-   label is bold and the value follows::
+    <li><b>Parent Name</b><br />Pat Parent</li>
+    <li><b>Player Name</b><br />Kim Kiddo</li>
+    <li><b>Email</b><br /><a href="mailto:pat@x.com">pat@x.com</a></li>
 
-       <li><b>Email</b><br /><a href="mailto:jane@x.com">jane@x.com</a></li>
+A plain-text variant is also handled, where each label is a numbered,
+asterisk-wrapped marker on its own line and the value follows::
 
-2. An older plain-text / forwarded re-rendering where each field label is a
-   numbered, asterisk-wrapped marker on its own line, value on the next::
-
-       1. *Name*
-       Jane Doe
-       2. *Email*
-       jane@x.com
+    1. *Parent Name*
+    Pat Parent
 
 Both reduce to a ``{canonical_field: value}`` mapping that is then validated:
 the client email is required, must be a real address, and must NOT be one of
 the business's own addresses (the From/To headers carry those, never a client).
+Every other field is optional — see :func:`validate_and_build`.
 
 When neither layout parses, ``app/extractor.py`` falls back to an LLM. That
 fallback reuses :func:`validate_and_build` here, so the recipient email is
@@ -40,21 +39,21 @@ class ParseError(Exception):
 # against the marker text / bold label). The form's free-text box is labeled
 # "Textarea"; we map it to our canonical "message".
 #
-# The form emits TWO "Name" rows: the first is the parent/guardian, the second
-# is the child/athlete. Both share the label "Name", so they can't be told apart
-# by label alone — they are split by order (see :func:`_assign_names`) into the
-# canonical "name" (parent) and "child_name" (kid) fields.
+# The form labels its two name fields distinctly: "Parent Name" (the guardian we
+# reply to) and "Player Name" (the athlete the inquiry is about). A bare "Name"
+# is also accepted as the parent, so a single-name form degrades gracefully
+# rather than losing the name entirely.
 FIELD_LABELS: dict[str, list[str]] = {
-    "name": ["name", "full name"],
+    "name": ["parent name", "name", "full name"],
+    "child_name": ["player name", "child name", "athlete name"],
     "email": ["email", "email address", "e-mail"],
     "phone": ["phone", "phone number"],
     "message": ["textarea", "message", "comments"],
 }
 
-# Optional canonical fields that have no distinct label (filled positionally).
-EXTRA_OPTIONAL_FIELDS: tuple[str, ...] = ("child_name",)
-
-# A draft cannot be addressed without the client's email.
+# A draft cannot be addressed without the client's email. Every other field is
+# optional: absent ones land in ``InquiryFields.missing_fields`` and the drafter
+# is told about them, so a partial submission still produces a draft.
 REQUIRED: list[str] = ["email"]
 
 # The business's own domains. A parsed *client* email must never be one of
@@ -68,19 +67,6 @@ _TAG_RE = re.compile(r"<[^>]+>")
 # Each <li>…</li> form-field item, and the bold label inside it.
 _LI_RE = re.compile(r"<li\b[^>]*>(.*?)</li>", re.IGNORECASE | re.DOTALL)
 _BOLD_RE = re.compile(r"<(?:b|strong)\b[^>]*>(.*?)</(?:b|strong)>", re.IGNORECASE | re.DOTALL)
-
-
-def _assign_names(collected: dict[str, str], name_values: list[str]) -> None:
-    """Split the ordered "Name" values into parent (``name``) and child fields.
-
-    The form's first Name is the parent/guardian, the second is the child/
-    athlete. Mutates ``collected`` in place; extra names beyond the second are
-    ignored. Empty values are not passed in.
-    """
-    if name_values:
-        collected["name"] = name_values[0]
-    if len(name_values) > 1:
-        collected["child_name"] = name_values[1]
 
 
 def _label_lookup() -> dict[str, str]:
@@ -116,7 +102,6 @@ def _parse_html_list(body: str) -> dict[str, str]:
     """Extract fields from the real ``<li><b>Label</b> value`` HTML notification."""
     lookup = _label_lookup()
     collected: dict[str, str] = {}
-    name_values: list[str] = []  # ordered: [0] parent, [1] child
     for inner in _LI_RE.findall(body):
         bold = _BOLD_RE.search(inner)
         if not bold:
@@ -128,14 +113,9 @@ def _parse_html_list(body: str) -> dict[str, str]:
         # The value is everything in the <li> except the bold label itself.
         value_html = inner[: bold.start()] + inner[bold.end() :]
         value = _clean_value(canonical, _strip_html(value_html))
-        if not value:
-            continue  # skip duplicate/empty label rows some forms emit
-        if canonical == "name":
-            name_values.append(value)
-        elif not collected.get(canonical):
-            # First non-empty wins for the single-valued fields.
+        # First non-empty wins (some forms emit duplicate/empty label rows).
+        if value and not collected.get(canonical):
             collected[canonical] = value
-    _assign_names(collected, name_values)
     return collected
 
 
@@ -143,36 +123,22 @@ def _parse_marker_format(text: str) -> dict[str, str]:
     """Extract fields from the ``N. *Label*`` marker layout (value on next lines)."""
     lookup = _label_lookup()
     values: dict[str, list[str]] = {}
-    name_groups: list[list[str]] = []  # one line-list per "Name" marker, in order
-    current: list[str] | None = None  # value lines of the field we are collecting
+    current: str | None = None  # the field whose value lines we are collecting
     for raw_line in text.splitlines():
         line = raw_line.rstrip()
         match = _LABEL_LINE_RE.match(line)
         if match:
-            # A new marker: switch context. Each "Name" marker starts its own
-            # group (parent then child); unknown labels set current to None so
-            # their value lines are ignored rather than misattributed.
-            canonical = lookup.get(match.group(1).strip().lower())
-            if canonical == "name":
-                current = []
-                name_groups.append(current)
-            elif canonical is not None:
-                current = values.setdefault(canonical, [])
-            else:
-                current = None
+            # A new marker: switch context. Unknown labels set current to None
+            # so their value lines are ignored rather than misattributed.
+            current = lookup.get(match.group(1).strip().lower())
+            if current is not None:
+                values.setdefault(current, [])
             continue
         if current is not None:
-            current.append(line)
+            values[current].append(line)
 
     collected = {key: _clean_value(key, "\n".join(parts)) for key, parts in values.items()}
-    collected = {key: value for key, value in collected.items() if value}
-    name_values = [
-        cleaned
-        for group in name_groups
-        if (cleaned := _clean_value("name", "\n".join(group)))
-    ]
-    _assign_names(collected, name_values)
-    return collected
+    return {key: value for key, value in collected.items() if value}
 
 
 def validate_and_build(
@@ -197,10 +163,11 @@ def validate_and_build(
     if any(lowered.endswith("@" + domain) or lowered.endswith("." + domain) for domain in business_domains):
         raise ParseError(f"Parsed email {email!r} belongs to the business, not a client")
 
-    # Optional fields that came back empty are flagged for human review.
+    # Optional fields that came back empty are flagged for human review and
+    # named to the drafter, which still writes a draft without them.
     missing = [
         field_name
-        for field_name in (*FIELD_LABELS, *EXTRA_OPTIONAL_FIELDS)
+        for field_name in FIELD_LABELS
         if field_name not in REQUIRED and not collected.get(field_name)
     ]
 

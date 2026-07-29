@@ -8,13 +8,15 @@ from dataclasses import dataclass, field
 class InquiryFields:
     """Structured result of parsing an inquiry email body.
 
-    Mirrors the real "The Mental Gain" contact form, which collects two Name
-    fields (the parent/guardian first, then the child/athlete), Email, Phone and
-    a free-text message (the form's "Textarea" field).
+    Mirrors the real "The Mental Gain" contact form, which collects a "Parent
+    Name" (the guardian we reply to), a "Player Name" (the young athlete the
+    inquiry is about), Email, Phone and a free-text message (the form's
+    "Textarea" field).
 
     ``email`` is required (a draft cannot be addressed without it). All other
-    fields are optional; absent ones are listed in ``missing_fields`` so the
-    drafter can flag them for human review instead of inventing values.
+    fields are optional; absent ones are listed in ``missing_fields``, which is
+    passed to the drafter so it writes around the gap instead of inventing
+    values. A partial submission still produces a draft.
     """
 
     email: str
