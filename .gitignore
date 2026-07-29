@@ -7,6 +7,10 @@ token.json
 out/*
 !out/.gitkeep
 
+# Scratch prompt/profile variants for `local_test --prompt/--profile` (see
+# RUNBOOK_PROMPT_TUNING.md). Keeps wording experiments out of git.
+config/*_experiment.md
+
 # Example inquiries contain real client PII — keep them out of git.
 # (examples/README.md stays tracked to document the format.)
 examples/*.txt

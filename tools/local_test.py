@@ -3,15 +3,22 @@
 Runs the SAME parser and drafter used in production against the example
 inquiry files, writing results to out/ so you can rapidly tune the prompt.
 
+Reads every ``examples/*.eml`` (a raw message saved from Gmail via
+"Show original" → "Download original") and ``examples/*.txt`` (a body-only
+paste). For ``.eml`` files the RFC-822 headers are stripped first, so the parser
+sees the same body ``app.run`` would hand it.
+
 Usage:
     python -m tools.local_test                 # all examples, with OpenAI
     python -m tools.local_test --no-llm        # parser only (free)
-    python -m tools.local_test --one 2011.txt  # a single example
+    python -m tools.local_test --one 2047.eml  # a single example
     python -m tools.local_test --prompt config/prompt_template.md --model gpt-4o
 
-Outputs per example <name>.txt:
+Outputs per example <name>:
     out/<name>.parsed.json   what the parser extracted (+ flagged-missing fields)
-    out/<name>.draft.txt     the generated email body (unless --no-llm)
+    out/<name>.draft.txt     the generated OPENING PARAGRAPH (unless --no-llm).
+                             NOT the whole email: app.run appends the fixed
+                             config/template_body.* and the Gmail signature.
     out/<name>.error.txt     written instead if parsing/drafting failed
 """
 from __future__ import annotations
@@ -41,7 +48,24 @@ def _select_files(one: str | None) -> list[Path]:
         if not candidate.exists():
             raise SystemExit(f"Example not found: {candidate}")
         return [candidate]
-    return sorted(EXAMPLES.glob("*.txt"))
+    return sorted(
+        path for pattern in ("*.eml", "*.txt") for path in EXAMPLES.glob(pattern)
+    )
+
+
+def _read_body(path: Path) -> str:
+    """Read an example, dropping RFC-822 headers from raw ``.eml`` downloads.
+
+    A ``.txt`` example is already body-only and is read verbatim — it may well
+    contain a blank line early on, so header-stripping must NOT be applied to it.
+    """
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix.lower() != ".eml":
+        return text
+    headers, separator, body = text.partition("\n\n")
+    if not separator:
+        return text  # no header/body split found; treat the whole file as body
+    return body
 
 
 def _write(path: Path, text: str) -> None:
@@ -73,12 +97,17 @@ def main(argv: list[str] | None = None) -> int:
 
     OUT.mkdir(exist_ok=True)
     files = _select_files(args.one)
+    if not files:
+        raise SystemExit(
+            f"No examples found in {EXAMPLES.relative_to(ROOT)}/ — save an inquiry "
+            'from Gmail ("Show original" → "Download original") as examples/<n>.eml'
+        )
     log.info("Processing %d example(s); llm=%s model=%s", len(files), not args.no_llm, settings.openai_model)
 
     ok = errors = 0
     for path in files:
         stem = path.stem
-        body = path.read_text(encoding="utf-8")
+        body = _read_body(path)
         try:
             fields = parse(body)
         except ParseError as error:

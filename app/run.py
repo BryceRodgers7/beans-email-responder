@@ -337,6 +337,37 @@ def retry_errors(client, settings: Settings) -> int:
     return len(msg_ids)
 
 
+def reset_drafted(client, settings: Settings) -> int:
+    """Move already-drafted inquiries back to New so a later pass re-drafts them.
+
+    This is the reset step of the prompt-tuning loop (see
+    RUNBOOK_PROMPT_TUNING.md): :func:`run_once` moves each drafted inquiry
+    New -> AI Draft Created, so re-running finds nothing until they are re-queued.
+
+    Capped at ``max_batch`` — all a following pass can process anyway, and it
+    keeps a stray invocation from re-queueing a long history of already-answered
+    inquiries. Gmail returns newest first, so the most recent (i.e. the test
+    cases being iterated on) come back first. Run again to reset more.
+
+    Returns the count moved. NOTE: the drafts already created for those inquiries
+    are NOT touched — a re-run adds another draft alongside each existing one.
+    """
+    labels = client.ensure_labels([settings.label_new, settings.label_done])
+    new_id = labels[settings.label_new]
+    done_id = labels[settings.label_done]
+
+    msg_ids = client.list_message_ids(done_id, settings.max_batch)
+    for msg_id in msg_ids:
+        client.move(msg_id, [new_id], [done_id])
+    log.info(
+        "Re-queued %d inquiry message(s): %r -> %r (existing drafts left in place)",
+        len(msg_ids),
+        settings.label_done,
+        settings.label_new,
+    )
+    return len(msg_ids)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="app.run", description="Draft AI replies for website inquiries."
@@ -351,6 +382,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Move inquiries from the Error label back to New (to re-process after "
         "a parser/prompt fix), then run a normal pass.",
+    )
+    parser.add_argument(
+        "--reset-drafted",
+        action="store_true",
+        help="Move already-drafted inquiries from the AI Draft Created label back to "
+        "New, then run a normal pass: the reset step of the prompt-tuning loop. "
+        "Re-drafts them; existing drafts are left in place, so delete those first. "
+        "Limited to max_batch inquiries (newest first).",
     )
     args = parser.parse_args(argv)
 
@@ -393,6 +432,8 @@ def main(argv: list[str] | None = None) -> int:
     client = GmailClient.from_settings(settings)
     if args.retry_errors:
         retry_errors(client, settings)
+    if args.reset_drafted:
+        reset_drafted(client, settings)
     footer = resolve_footer(client, settings)
     template = load_template()
     attachments = load_attachments()

@@ -14,6 +14,7 @@ from app.run import (
     build_draft_subject,
     load_attachments,
     load_file_footer,
+    reset_drafted,
     resolve_footer,
     retry_errors,
     run_once,
@@ -54,6 +55,7 @@ class FakeGmailClient:
         self.draft_attachments: list[list[dict] | None] = []  # attachments per draft
         self.draft_labels: list[tuple[str, str]] = []
         self.moves: list[tuple[str, list[str], list[str]]] = []
+        self.list_calls: list[tuple[str, int]] = []  # (label_id, max_results)
         self._counter = 0
 
     def get_signature(self):
@@ -63,6 +65,7 @@ class FakeGmailClient:
         return {name: f"id::{name}" for name in names}
 
     def list_message_ids(self, label_id, max_results):
+        self.list_calls.append((label_id, max_results))
         return list(self.messages.keys())
 
     def get_text_and_subject(self, msg_id):
@@ -280,3 +283,31 @@ def test_retry_errors_moves_error_back_to_new(settings):
         ("e1", ["id::Website Inquiries/New"], ["id::Website Inquiries/Error"]),
         ("e2", ["id::Website Inquiries/New"], ["id::Website Inquiries/Error"]),
     ]
+
+
+def test_reset_drafted_moves_done_back_to_new(settings):
+    # The prompt-tuning reset: already-drafted inquiries get re-queued to New so
+    # the next pass drafts them again with the updated prompt.
+    client = FakeGmailClient({"d1": "x", "d2": "y"})
+    moved = reset_drafted(client, settings)
+    assert moved == 2
+    assert client.moves == [
+        ("d1", ["id::Website Inquiries/New"], ["id::Website Inquiries/AI Draft Created"]),
+        ("d2", ["id::Website Inquiries/New"], ["id::Website Inquiries/AI Draft Created"]),
+    ]
+
+
+def test_reset_drafted_is_capped_at_max_batch(settings):
+    # Bounded so a stray invocation can't re-queue a long history of answered
+    # inquiries — only as many as a following pass could process anyway.
+    client = FakeGmailClient({"d1": "x"})
+    reset_drafted(client, settings)
+    assert client.list_calls == [("id::Website Inquiries/AI Draft Created", settings.max_batch)]
+
+
+def test_reset_drafted_leaves_existing_drafts_alone(settings):
+    # It only moves labels: the drafts already created are not deleted or touched.
+    client = FakeGmailClient({"d1": "x"})
+    reset_drafted(client, settings)
+    assert client.drafts == []
+    assert client.draft_labels == []

@@ -38,7 +38,9 @@ app/
                     appended as one row to the permanent logs/process_log.tsv
                     (timestamp, status, extraction[parser|llm], subject, email,
                     message_id, error; committed by CI) + a $GITHUB_STEP_SUMMARY
-                    table. Flags: `--dry-run`, `--retry-errors`.
+                    table. Flags: `--dry-run`, `--retry-errors` (Error -> New),
+                    `--reset-drafted` (AI Draft Created -> New, capped at
+                    max_batch — the prompt-tuning reset; see the runbook).
   config.py         Loads config/settings.toml + secrets from env/.env → Settings.
   gmail_client.py   All Gmail I/O: OAuth creds (token.json local / env in CI),
                     ensure_labels, list_by_label, get body (base64url +
@@ -210,8 +212,11 @@ the HTML parser fix and the parent/player name handling.
   confidence / bouncing-back-from-mistakes concerns.
 - `config/template_body.txt` + `.html` (the fixed body) — keep the two in sync.
 - Fill the 2 remaining `business_profile.md` TODOs.
-- Fast loop without Gmail: drop redacted bodies in `examples/` and run
-  `python -m tools.local_test`.
+- Fast loop without Gmail: drop `.eml` downloads in `examples/` and run
+  `python -m tools.local_test`. **Sabrina drives this herself** — the
+  step-by-step is `RUNBOOK_PROMPT_TUNING.md` (written for a non-developer:
+  install, the free `--no-llm` read check, the tuning loop, which config file
+  owns what, how to export an inquiry from Gmail, troubleshooting).
 
 **Step 3 — Stop the failing cron** (§3). It has been failing 3× a day since June.
 Either add the three `GMAIL_*` secrets (from the **two-scope** consent) +
