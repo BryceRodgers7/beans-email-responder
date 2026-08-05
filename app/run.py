@@ -34,7 +34,7 @@ SIGNATURE_PATH = ROOT / "config" / "signature.txt"
 # Fixed body appended after the model's personalized opening paragraph.
 TEMPLATE_TEXT_PATH = ROOT / "config" / "template_body.txt"
 TEMPLATE_HTML_PATH = ROOT / "config" / "template_body.html"
-# Files attached to every draft (e.g. program options + consent PDFs).
+# Files attached to every draft (currently the program options PDF).
 ATTACHMENTS_DIR = ROOT / "attachments"
 
 
@@ -207,8 +207,22 @@ def resolve_footer(client, settings: Settings) -> Footer:
     return Footer()
 
 
-def build_draft_subject(settings: Settings) -> str:
-    return f"{settings.draft_subject_prefix.strip()} {settings.draft_subject.strip()}".strip()
+def build_draft_subject(settings: Settings, player_name: str | None = None) -> str:
+    """Subject for the draft, derived from the inquiry's Player Name.
+
+    With a player name: ``"<Player Name> Mental Performance"``. Without one (the
+    field is optional on the form): ``"Sport Mental Performance - The Mental
+    Gain"``. Both come from ``config/settings.toml``, and the optional
+    ``subject_prefix`` is prepended to either. Whitespace in the name is
+    collapsed so a stray newline can't break the Subject header.
+    """
+    player = " ".join((player_name or "").split())
+    base = (
+        settings.draft_subject_with_player.replace("{player}", player)
+        if player
+        else settings.draft_subject
+    )
+    return f"{settings.draft_subject_prefix.strip()} {base.strip()}".strip()
 
 
 def run_once(
@@ -295,7 +309,7 @@ def run_once(
                 html_chunks.append(footer.html)
             html_body = "\n".join(html_chunks) if (template.html or footer.html) else None
 
-            draft_subject = build_draft_subject(settings)
+            draft_subject = build_draft_subject(settings, fields.child_name)
             draft_msg_id = client.create_draft(
                 fields.email, draft_subject, text_body, html_body, attachments or None
             )

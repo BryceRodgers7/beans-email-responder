@@ -79,14 +79,15 @@ tools/
                     identify the live HTML format; keep for the next surprise.
 
 config/
-  settings.toml        model (gpt-4o-mini), labels, max_batch = 25, draft subject.
+  settings.toml        model (gpt-4o-mini), labels, max_batch = 25, draft
+                       subject templates (with / without a Player Name).
   business_profile.md  Facts for the opening paragraph, incl. "What athletes come
                        to us for" (the focus-area gate — see §3). 2 TODOs left.
   prompt_template.md   System prompt: model writes ONLY the opening paragraph.
-  template_body.txt    FIXED body (services/link/options/consent), plain text.
+  template_body.txt    FIXED body (services/options/link), plain text.
   template_body.html   FIXED body, HTML (rendered part of the draft).
   signature.txt        Fallback footer (normally the Gmail signature is used).
-attachments/           PDFs attached to every draft (program options + consent).
+attachments/           PDFs attached to every draft (program options).
 .github/workflows/
   draft.yml            Scheduled run (cron 13/17/21 UTC) + workflow_dispatch.
                        Committed and pushed — see §3 for the open question.

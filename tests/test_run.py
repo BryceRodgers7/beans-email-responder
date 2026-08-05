@@ -34,6 +34,22 @@ You have a new website form submission:
    My daughter plays volleyball. Looking for info.
 """
 
+BODY_WITH_PLAYER = """\
+You have a new website form submission:
+
+   1. *Parent Name*
+   Pat Parent
+   2. *Player Name*
+   Kim Kiddo
+   3. *Email*
+   pat.parent@gmail.com
+   4. *Phone*
+   (555) 010-0100
+   5. *Textarea*
+
+   She gets in her head before games. Looking for more info.
+"""
+
 JUNK_BODY = "no form fields here at all"
 
 
@@ -87,8 +103,39 @@ class FakeGmailClient:
         self.moves.append((msg_id, add_label_ids, remove_label_ids))
 
 
-def test_subject_built_from_settings(settings):
-    assert build_draft_subject(settings) == "Re: your inquiry"
+def test_subject_uses_player_name_when_present(settings):
+    assert build_draft_subject(settings, "Kim Kiddo") == "Kim Kiddo Mental Performance"
+
+
+def test_subject_falls_back_when_no_player_name(settings):
+    fallback = "Sport Mental Performance - The Mental Gain"
+    assert build_draft_subject(settings) == fallback
+    assert build_draft_subject(settings, None) == fallback
+    # Whitespace-only is treated as absent, not as an empty-name subject.
+    assert build_draft_subject(settings, "   ") == fallback
+
+
+def test_subject_collapses_whitespace_in_player_name(settings):
+    assert build_draft_subject(settings, " Kim\n Kiddo ") == "Kim Kiddo Mental Performance"
+
+
+def test_subject_prefix_applies_to_both_forms(settings):
+    prefixed = dataclasses.replace(settings, draft_subject_prefix="[AI Draft]")
+    assert build_draft_subject(prefixed, "Kim Kiddo") == "[AI Draft] Kim Kiddo Mental Performance"
+    assert (
+        build_draft_subject(prefixed)
+        == "[AI Draft] Sport Mental Performance - The Mental Gain"
+    )
+
+
+def test_draft_subject_uses_parsed_player_name(settings):
+    client = FakeGmailClient({"m1": BODY_WITH_PLAYER})
+    drafted, errored = run_once(client, settings, generate=lambda f, s: "Drafted body")
+
+    assert (drafted, errored) == (1, 0)
+    to, subject, _body, _draft_id = client.drafts[0]
+    assert to == "pat.parent@gmail.com"
+    assert subject == "Kim Kiddo Mental Performance"
 
 
 def test_valid_inquiry_drafts_to_client_and_moves_to_done(settings):
@@ -99,7 +146,8 @@ def test_valid_inquiry_drafts_to_client_and_moves_to_done(settings):
     # Draft addressed to the client email from the form body, not the sender.
     to, subject, body, draft_id = client.drafts[0]
     assert to == "jane.sample@gmail.com"
-    assert subject == "Re: your inquiry"
+    # This form had no Player Name, so the draft gets the generic subject.
+    assert subject == "Sport Mental Performance - The Mental Gain"
     assert body == "Drafted body"
     # Draft was labeled with the AI-assisted-drafts label.
     assert client.draft_labels == [(draft_id, "id::Website Inquiries/AI Assisted Drafts")]

@@ -43,8 +43,10 @@ class Settings:
     label_error: str
     label_drafts: str
     max_batch: int
-    # Draft subject
+    # Draft subject. ``draft_subject_with_player`` is used when the inquiry gave
+    # a player name ({player} is substituted); ``draft_subject`` is the fallback.
     draft_subject_prefix: str
+    draft_subject_with_player: str
     draft_subject: str
 
 
@@ -69,7 +71,10 @@ def load_settings(require_secrets: bool = False) -> Settings:
         label_drafts=gmail_cfg.get("label_drafts", "Website Inquiries/AI Assisted Drafts"),
         max_batch=int(gmail_cfg.get("max_batch", 25)),
         draft_subject_prefix=draft_cfg.get("subject_prefix", "[AI Draft]"),
-        draft_subject=draft_cfg.get("subject", "Re: your inquiry"),
+        draft_subject_with_player=draft_cfg.get(
+            "subject_with_player", "{player} Mental Performance"
+        ),
+        draft_subject=draft_cfg.get("subject", "Sport Mental Performance - The Mental Gain"),
     )
 
     if require_secrets:
