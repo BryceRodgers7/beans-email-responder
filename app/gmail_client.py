@@ -268,7 +268,7 @@ class GmailClient:
         """Create a draft addressed to ``to``; returns the draft message id.
 
         ``html_body`` adds an HTML alternative part (so the signature's links and
-        images render); ``attachments`` adds files (e.g. the program/consent PDFs).
+        images render); ``attachments`` adds files (e.g. the program options PDF).
         """
         raw = build_raw_message(to, subject, body, html_body, attachments)
         draft = (

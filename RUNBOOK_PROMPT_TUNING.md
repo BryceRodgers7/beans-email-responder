@@ -134,9 +134,10 @@ gets worse, you won't know which one did it.
 
 ## 3d. Delete the previous round's drafts
 
-**Every run creates a brand-new draft — it never updates the old one.** And every
-draft has the same subject (`Re: your inquiry`), so after three rounds you'd have
-three identical-looking drafts per test email and no way to tell which is current.
+**Every run creates a brand-new draft — it never updates the old one.** And each
+round's draft has the same subject as the last (`<Player Name> Mental
+Performance`), so after three rounds you'd have three identical-looking drafts
+per test email and no way to tell which is current.
 
 So select the drafts you just read and delete them (the 🗑 icon). Then the
 `AI Assisted Drafts` label always shows exactly the round you last ran.

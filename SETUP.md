@@ -99,7 +99,8 @@ python -m app.run               # one real pass: creates drafts, never sends
 ```
 
 Check the sister's Gmail: drafts appear under **Drafts** (subject
-`Re: your inquiry`, tagged `Website Inquiries/AI Assisted Drafts`) and the
+`<Player Name> Mental Performance`, tagged `Website Inquiries/AI Assisted
+Drafts`) and the
 inquiry moved from `Website Inquiries/New` to `Website Inquiries/AI Draft
 Created`. Review/edit/send each draft manually.
 

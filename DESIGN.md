@@ -223,7 +223,7 @@ This means **one** consent, and the long-lived refresh token is the only Gmail s
   - `temperature` low (e.g. `0.4`).
   - The system prompt instructs: *if key info is missing, do not fabricate — instead include a clearly marked line the business owner can fill in, e.g. `[NEEDS REVIEW: client did not specify a budget/timeline].`*
   - We pass the parsed fields as structured text, not the raw email, so the model can't latch onto signatures/footers.
-- **Output:** plain email body text (no subject invention; subject is derived deterministically from `config/settings.toml` — `Re: your inquiry` by default, with an optional prefix). The business footer from `config/signature.txt` is appended after the model's text.
+- **Output:** plain email body text (no subject invention; the subject is derived deterministically from the parsed Player Name — `<Player Name> Mental Performance`, or `Sport Mental Performance - The Mental Gain` when the form gave no player name. Both templates live in `config/settings.toml`, with an optional prefix). The business footer from `config/signature.txt` is appended after the model's text.
 - **Resilience:** one retry with backoff on transient errors; on hard failure the message goes to `Error`. Token/usage is logged (counts only) for cost visibility.
 - **Cost:** at a few inquiries/day on `gpt-4o-mini`, this is fractions of a cent per draft.
 

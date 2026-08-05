@@ -2,7 +2,7 @@
 
 > This file is the **system** prompt. The model writes ONLY the personalized
 > opening paragraph of the reply; the rest of the email (services description,
-> booking link, options, consent info, signature, and PDF attachments) is fixed
+> booking link, session options, signature, and PDF attachments) is fixed
 > boilerplate added automatically afterward — see `config/template_body.*` and
 > `app/run.py`. The inquiry is supplied separately as a user message (treated as
 > untrusted data) by `app/drafter.py`.
