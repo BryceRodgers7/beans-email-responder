@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 
 import pytest
 
 from app.config import load_settings
+from app.models import InquiryFields
 from app.run import (
     Footer,
     ProcessRecord,
@@ -189,6 +191,54 @@ def test_mixed_batch_is_isolated(settings):
     drafted, errored = run_once(client, settings, generate=lambda f, s: "ok")
     assert (drafted, errored) == (1, 1)
     assert len(client.drafts) == 1
+
+
+@pytest.fixture
+def summary_of(caplog):
+    """Run a batch and return its closing "Run complete" console line.
+
+    ``app.run`` logs to a named, non-propagating logger, so caplog's root
+    handler never sees it — attach the handler to that logger directly.
+    """
+    app_log = logging.getLogger("email_drafter")
+    app_log.addHandler(caplog.handler)
+
+    def run_and_capture(*args, **kwargs) -> str:
+        run_once(*args, **kwargs)
+        lines = [r.getMessage() for r in caplog.records if "Run complete" in r.getMessage()]
+        assert len(lines) == 1, f"expected one summary line, got {lines}"
+        return lines[0]
+
+    yield run_and_capture
+    app_log.removeHandler(caplog.handler)
+
+
+def test_summary_reports_extraction_method_counts(settings, summary_of):
+    """The closing console line is where a CLI run surfaces AI-fallback usage."""
+    client = FakeGmailClient({"m1": VALID_BODY})
+    summary = summary_of(client, settings, generate=lambda f, s: "ok")
+
+    assert "drafted=1 errored=0" in summary
+    assert "extraction: parser=1 AI-fallback=0" in summary
+    assert "unread" not in summary  # only shown when non-zero
+
+
+def test_summary_counts_llm_fallback_extractions(settings, summary_of):
+    def llm_extract(body, settings):
+        return InquiryFields(email="pat.parent@gmail.com", extraction_method="llm")
+
+    client = FakeGmailClient({"m1": VALID_BODY})
+    summary = summary_of(client, settings, generate=lambda f, s: "ok", extract=llm_extract)
+
+    assert "extraction: parser=0 AI-fallback=1" in summary
+
+
+def test_summary_counts_inquiries_that_never_reached_extraction(settings, summary_of):
+    # JUNK_BODY fails in the parser before any method is recorded.
+    client = FakeGmailClient({"good": VALID_BODY, "bad": JUNK_BODY})
+    summary = summary_of(client, settings, generate=lambda f, s: "ok")
+
+    assert "extraction: parser=1 AI-fallback=0 unread=1" in summary
 
 
 def test_run_once_appends_footer_text_and_html(settings):

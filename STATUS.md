@@ -34,7 +34,9 @@ app/
                     create draft → label draft → relabel inquiry (New→Done,
                     or →Error on failure). Per-message failures are isolated.
                     Console output groups lines per inquiry ([i/N] + subject,
-                    not Gmail id). EVERY processed inquiry (drafted or errored) is
+                    not Gmail id) and closes with a summary line: drafted/errored
+                    plus how the batch was read (parser vs. AI-fallback counts).
+                    EVERY processed inquiry (drafted or errored) is
                     appended as one row to the permanent logs/process_log.tsv
                     (timestamp, status, extraction[parser|llm], subject, email,
                     message_id, error; committed by CI) + a $GITHUB_STEP_SUMMARY

@@ -248,6 +248,12 @@ def run_once(
 
     Per-message failures are isolated: the inquiry is moved to the Error label
     and the run continues. Returns (drafted, errored) counts.
+
+    The closing summary line also reports how the batch was read — ``parser``
+    (deterministic) vs. ``AI-fallback`` (the LLM extractor, used only when the
+    parser fails), plus ``unread`` for inquiries that errored before extraction
+    finished. The per-inquiry method is also in the permanent TSV log's
+    ``extraction`` column.
     """
     labels = client.ensure_labels(
         [settings.label_new, settings.label_done, settings.label_error, settings.label_drafts]
@@ -262,6 +268,10 @@ def run_once(
     log.info("=== Found %d inquiry message(s) under %r ===", total, settings.label_new)
 
     drafted = errored = 0
+    # How the fields were read, counted across the batch. "llm" means the
+    # deterministic parser couldn't read the form and the AI fallback ran —
+    # worth watching, since it costs a call and is less predictable.
+    by_extraction = {"parser": 0, "llm": 0}
 
     def record(rec: ProcessRecord) -> None:
         if on_processed is not None:
@@ -287,6 +297,8 @@ def run_once(
             fields = extract(body, settings)
             customer_email = fields.email
             extraction = fields.extraction_method
+            if extraction in by_extraction:
+                by_extraction[extraction] += 1
             if extraction == "llm":
                 log.info("[%d/%d]   (parser couldn't read it; used LLM extraction)", idx, total)
         except ParseError as error:
@@ -324,7 +336,15 @@ def run_once(
         except Exception as error:  # noqa: BLE001
             errored_out(idx, msg_id, inquiry_subject, extraction, customer_email, "draft", error, severe=True)
 
-    log.info("=== Run complete: drafted=%d errored=%d ===", drafted, errored)
+    unread = total - by_extraction["parser"] - by_extraction["llm"]
+    log.info(
+        "=== Run complete: drafted=%d errored=%d | extraction: parser=%d AI-fallback=%d%s ===",
+        drafted,
+        errored,
+        by_extraction["parser"],
+        by_extraction["llm"],
+        f" unread={unread}" if unread else "",
+    )
     return drafted, errored
 
 
