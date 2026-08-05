@@ -41,7 +41,7 @@ does not need to (and must not) describe specific offerings or pricing here.
 
 ## Voice & tone
 - Warm, professional, conversational, concise, helpful.
-- Not overly formal. Not pushy or salesy.
+- Not overly formal. Not pushy or salesy. Almost casual, so it seems like a human wrote it.
 - Sign-off/footer is NOT written by the model — it is appended automatically
   from the account's **Gmail signature** (with `config/signature.txt` as a
   fallback). Keep the footer out of this profile and the model's output.

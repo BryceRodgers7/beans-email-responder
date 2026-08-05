@@ -88,8 +88,9 @@ reset → run again.**
 
 Make sure your test emails carry the `Website Inquiries/New` label, then:
 
-```powershell
-python -m app.run
+```OPEN powershell APPLICATION 
+type  cd C:\git\beans-email-responder\
+then type:  python -m app.run then push enter
 ```
 
 You'll see one block per inquiry and a summary line:
