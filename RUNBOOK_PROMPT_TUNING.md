@@ -235,9 +235,7 @@ Two cautions:
   information.
 - The AI treats **everything** in `business_profile.md` as fact, including
   examples. If you write "e.g. a free 20-minute call," it will offer clients a
-  free 20-minute call. Only put true things in that file. Two spots are still
-  marked `TODO` — the practice description and the preferred next step — and the
-  drafts will stay generic until they're filled in.
+  free 20-minute call. Only put true things in that file.
 
 ## 5. Blank form fields
 

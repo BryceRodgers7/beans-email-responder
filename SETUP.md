@@ -159,6 +159,5 @@ successfully, move them from `AI Draft Created` back to `New` in Gmail first.)
   `GMAIL_REFRESH_TOKEN` secret.
 - **No-send guarantee:** the app only requests `gmail.modify` (read + label +
   create draft). It has no send permission, so it cannot email anyone.
-- **Business voice:** fill in the `TODO:` items in `config/business_profile.md`
-  (services, sign-off, call-to-action) for higher-quality drafts. Iterate with
-  `python -m tools.local_test` before/after going live.
+- **Business voice:** tune `config/business_profile.md` for higher-quality
+  drafts. Iterate with `python -m tools.local_test` before/after going live.

@@ -33,9 +33,6 @@ against `examples/2011-2013.txt`.
 
 ## ⚠️ Open TODOs
 
-- **Business profile / voice.** `config/business_profile.md` and
-  `config/prompt_template.md` have known facts filled in but still contain
-  `TODO:` items (services, sign-off, call-to-action) to complete before going live.
 - **PII in `examples/`.** `examples/2011-2013.txt` are real submissions with
   names/emails/phone numbers. Decide whether to gitignore `examples/` or keep
   redacted copies before committing to a public/shared repo.

@@ -5,7 +5,6 @@
 > it must not invent pricing, availability, commitments, or outcomes.
 >
 > ✅ Known facts are filled in from the website/notification emails.
-> ⚠️ Items marked TODO must be confirmed/completed before going live (Phase 2/5).
 
 ## Who we are
 The Mental Gain provides sports psychology / mental-performance coaching for
@@ -13,7 +12,6 @@ athletes (including youth and high-school athletes; inquiries often come from
 parents on behalf of their child).
 - Website: thementalgain.com
 - Contact email: info@thementalgain.com
-- TODO: confirm one or two sentences describing the practice and its approach.
 
 ## What athletes come to us for
 Sabrina's core specialty — and what roughly **80% of her athletes** seek her help
@@ -51,7 +49,3 @@ does not need to (and must not) describe specific offerings or pricing here.
 - Never promise availability, timelines, or specific outcomes/results.
 - Never make clinical or medical claims (e.g. about anxiety) or diagnoses.
 - Never make commitments on the owner's behalf.
-
-## Typical next step
-TODO: confirm the preferred call-to-action, e.g. "invite them to book a free
-intro call" or "ask for the athlete's sport, age, and what they're working on".

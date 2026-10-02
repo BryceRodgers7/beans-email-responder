@@ -84,7 +84,7 @@ config/
   settings.toml        model (gpt-4o-mini), labels, max_batch = 25, draft
                        subject templates (with / without a Player Name).
   business_profile.md  Facts for the opening paragraph, incl. "What athletes come
-                       to us for" (the focus-area gate — see §3). 2 TODOs left.
+                       to us for" (the focus-area gate — see §3).
   prompt_template.md   System prompt: model writes ONLY the opening paragraph.
   template_body.txt    FIXED body (services/options/link), plain text.
   template_body.html   FIXED body, HTML (rendered part of the draft).
@@ -172,10 +172,10 @@ Not done / open:
      ORIGINAL fell through to the slow/paid LLM extraction; only `Fwd:` mails
      (which carry a text/plain part) parsed. Fixed with `extract_best_body()`.
      **Don't reintroduce pre-stripping.**
-2. **`business_profile.md` has 2 TODOs left** — the one-or-two-sentence practice
-   description (§"Who we are") and the preferred call-to-action (§"Typical next
-   step"). The substantive content (focus areas, voice, prohibitions) is filled
-   in. Note: placeholder "e.g." text in this file WILL be repeated by the model
+2. **`business_profile.md` TODOs removed (2026-10-01)** — the practice
+   description and preferred call-to-action placeholders were dropped for now;
+   the substantive content (focus areas, voice, prohibitions) is filled in.
+   Note: placeholder "e.g." text in this file WILL be repeated by the model
    as fact — keep any placeholder non-specific.
 3. **✅ RESOLVED (2026-07-29) — parser reads `Parent Name` / `Player Name`.**
    `FIELD_LABELS` now maps them to `name` / `child_name` as distinct labels, so
@@ -201,7 +201,9 @@ Not done / open:
 
 ## 5. What to tackle next
 
-**Step 1 — Drain the error backlog** (on the machine with `token.json`):
+**Step 1 — Drain the error backlog** — *not a concern as of 2026-10-01: the
+root causes are fixed and the old `Error` items don't need chasing. Kept for
+reference* (on the machine with `token.json`):
 ```powershell
 python -m app.run --retry-errors   # moves Error → New and reprocesses
 python -m app.run                  # again if >25 remain (max_batch)
@@ -214,7 +216,6 @@ the HTML parser fix and the parent/player name handling.
   behaves: "happy to help" always, "sees a lot of this" only for
   confidence / bouncing-back-from-mistakes concerns.
 - `config/template_body.txt` + `.html` (the fixed body) — keep the two in sync.
-- Fill the 2 remaining `business_profile.md` TODOs.
 - Fast loop without Gmail: drop `.eml` downloads in `examples/` and run
   `python -m tools.local_test`. **Sabrina drives this herself** — the
   step-by-step is `RUNBOOK_PROMPT_TUNING.md` (written for a non-developer:
